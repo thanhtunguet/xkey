@@ -82,17 +82,22 @@ echo "📦 Copying to ./Release/XKey.app..."
 rm -rf Release/XKey.app
 cp -R "./build/Build/Products/Release/XKey.app" Release/
 
-# Verify code signature
-if [ "$ENABLE_CODESIGN" = true ]; then
-    echo "🔍 Verifying code signature..."
-    codesign -vvv --deep --strict Release/XKey.app
-    echo "✅ Code signature verified"
-    
-    # Display signature info
-    echo ""
-    echo "📝 Signature details:"
-    codesign -dvvv Release/XKey.app 2>&1 | grep -E "(Authority|Identifier|TeamIdentifier|Timestamp)"
+# Ad-hoc sign with correct identifier (required for Accessibility permissions)
+if [ "$ENABLE_CODESIGN" = false ]; then
+    echo "🔐 Ad-hoc signing with correct bundle identifier..."
+    codesign --force --deep --sign - --identifier "$BUNDLE_ID" Release/XKey.app
+    echo "✅ Ad-hoc signed with identifier: $BUNDLE_ID"
 fi
+
+# Verify code signature
+echo "🔍 Verifying code signature..."
+codesign -vvv --deep --strict Release/XKey.app
+echo "✅ Code signature verified"
+
+# Display signature info
+echo ""
+echo "📝 Signature details:"
+codesign -dvvv Release/XKey.app 2>&1 | grep -E "(Authority|Identifier|TeamIdentifier|Timestamp)"
 
 # Notarization (optional)
 if [ "$ENABLE_NOTARIZE" = true ] && [ "$ENABLE_CODESIGN" = true ]; then
