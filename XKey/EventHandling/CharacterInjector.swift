@@ -16,6 +16,8 @@ class CharacterInjector {
     private var isFirstWord: Bool = true  // Track if we're typing the first word
     private var keystrokeCount: Int = 0   // Track number of keystrokes in current word
     private var isTypingMidSentence: Bool = false  // Track if user moved cursor (typing in middle of text)
+    private var lastInjectionTime: UInt64 = 0  // Track when last character was injected (mach_absolute_time)
+    private static let injectionCooldownNs: UInt64 = 15_000_000  // 15ms cooldown between injections
     
     // Debug callback
     var debugCallback: ((String) -> Void)?
@@ -66,6 +68,26 @@ class CharacterInjector {
         debugCallback?("Keystroke count: \(keystrokeCount)")
     }
     
+    /// Wait for injection cooldown if needed (call BEFORE processing next keystroke)
+    /// This prevents race condition where backspace arrives before previous injection is rendered
+    func waitForInjectionCooldown() {
+        guard lastInjectionTime > 0 else { return }
+        
+        var timebaseInfo = mach_timebase_info_data_t()
+        mach_timebase_info(&timebaseInfo)
+        
+        let currentTime = mach_absolute_time()
+        let elapsedTicks = currentTime - lastInjectionTime
+        let elapsedNs = elapsedTicks * UInt64(timebaseInfo.numer) / UInt64(timebaseInfo.denom)
+        
+        if elapsedNs < CharacterInjector.injectionCooldownNs {
+            let remainingNs = CharacterInjector.injectionCooldownNs - elapsedNs
+            let remainingUs = UInt32(remainingNs / 1000)
+            debugCallback?("    → Injection cooldown: waiting \(remainingUs)µs")
+            usleep(remainingUs)
+        }
+    }
+    
     // MARK: - Public Methods
 
     /// Send backspace key presses with optional autocomplete fix
@@ -106,7 +128,7 @@ class CharacterInjector {
                 sendBackspace(codeTable: codeTable, proxy: proxy)
                 debugCallback?("    → Backspace \(i + 1)/\(count)")
             }
-            usleep(2000) // 2ms delay after backspaces
+            usleep(5000) // 5ms delay after backspaces (increased for Chrome compatibility)
         } else {
             // Normal backspace without autocomplete fix
             debugCallback?("    → Normal backspaces (no fix)")
@@ -131,6 +153,11 @@ class CharacterInjector {
             let unicodeString = character.unicode(codeTable: codeTable)
             debugCallback?("  [\(index)]: Sending '\(unicodeString)' (Unicode: \(unicodeString.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: ", ")))")
             sendString(unicodeString, proxy: proxy)
+        }
+        
+        // Record injection time for cooldown tracking
+        if characters.count > 0 {
+            lastInjectionTime = mach_absolute_time()
         }
     }
 

@@ -107,9 +107,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Set up engine logging
         self.engine.logCallback = { [weak self] message in
-            #if DEBUG
             self?.debugLogCallback?("🔧 Engine: \(message)")
-            #endif
         }
         
         // Set up injector debug logging
@@ -121,11 +119,37 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         VNEngine.setSharedMacroManager(macroManager)
         VNEngine.setSharedSmartSwitchManager(smartSwitchManager)
         
+        // Macro manager logging disabled for cleaner output
+        // macroManager.logCallback = { [weak self] message in
+        //     self?.debugLogCallback?("📦 Macro: \(message)")
+        // }
+        
         // Load macro data from UserDefaults
         loadMacrosFromUserDefaults()
         
         // Load smart switch data from file
         loadSmartSwitchData()
+        
+        // Listen for macro changes from UI
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleMacrosDidChange),
+            name: .macrosDidChange,
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func handleMacrosDidChange() {
+        loadMacrosFromUserDefaults()
+        
+        // Reset engine to clear buffer when macros change
+        // This prevents stale buffer from interfering with new macro matching
+        engine.reset()
+        injector.markNewSession()
     }
     
     // MARK: - Smart Switch Data Loading
@@ -137,9 +161,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         
         if smartSwitchManager.loadFromFile(path: path) {
             let apps = smartSwitchManager.getAllApps()
-            #if DEBUG
             debugLogCallback?("📦 Loaded \(apps.count) app language settings from file")
-            #endif
         }
     }
     
@@ -147,14 +169,15 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     private func loadMacrosFromUserDefaults() {
         let userDefaultsKey = "XKey.Macros"
+        
+        // Clear existing macros first to avoid duplicates
+        macroManager.clearAll()
+        
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
            let macros = try? JSONDecoder().decode([MacroItemData].self, from: data) {
             for macro in macros {
                 _ = macroManager.addMacro(text: macro.text, content: macro.content)
             }
-            #if DEBUG
-            debugLogCallback?("📦 Loaded \(macros.count) macros from UserDefaults")
-            #endif
         }
     }
     
@@ -176,9 +199,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         if !isVietnameseEnabled {
             engine.reset()
         }
-        #if DEBUG
         debugLogCallback?("Vietnamese input: \(isVietnameseEnabled ? "ON" : "OFF"), vLanguage=\(engine.vLanguage)")
-        #endif
     }
     
     func setVietnamese(_ enabled: Bool) {
@@ -316,16 +337,12 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
         
         if isWordBreakKey(character) {
-            debugLogCallback?("  → WORD BREAK - checking macro first (englishMode=\(isEnglishModeWithMacro))")
             let result = engine.processWordBreak(character: character)
             
             // Check if macro was found and replaced
             if result.shouldConsume {
-                debugLogCallback?("  → MACRO FOUND! bs=\(result.backspaceCount) chars=\(result.newCharacters.count)")
-                
                 // Send backspaces
                 if result.backspaceCount > 0 {
-                    debugLogCallback?("    → Send \(result.backspaceCount) backspaces")
                     injector.sendBackspaces(
                         count: result.backspaceCount,
                         codeTable: codeTable,
@@ -336,8 +353,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                 
                 // Send macro replacement characters
                 if !result.newCharacters.isEmpty {
-                    let chars = result.newCharacters.map { $0.unicode(codeTable: codeTable) }.joined()
-                    debugLogCallback?("    → Inject macro: \(chars)")
                     injector.sendCharacters(result.newCharacters, codeTable: codeTable, proxy: proxy)
                 }
                 
@@ -351,7 +366,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             // Reset mid-sentence flag on Enter/Return - user is starting a new line
             if character == "\n" || character == "\r" {
                 injector.resetMidSentenceFlag()
-                debugLogCallback?("  → New line - reset mid-sentence flag")
             }
             
             return event
@@ -359,11 +373,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // In English mode with macro, only accumulate macro keys without Vietnamese processing
         if isEnglishModeWithMacro {
-            debugLogCallback?("  → English mode with macro - accumulating key for macro")
             engine.addKeyToMacroBuffer(keyCode: keyCode, isCaps: isUppercase)
             return event  // Pass through without Vietnamese processing
         }
 
+        // Wait for any pending injection to complete before processing next keystroke
+        // This prevents race condition in Chrome where backspace arrives before previous character is rendered
+        injector.waitForInjectionCooldown()
+        
         // Process through engine (Vietnamese mode)
         debugLogCallback?("  → Calling engine.processKey('\(character)')...")
         let result = engine.processKey(
@@ -429,7 +446,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // In English mode with macro, only update macro buffer
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
         if isEnglishModeWithMacro {
-            debugLogCallback?("  → English mode with macro - updating macro buffer on backspace")
             engine.updateMacroBufferOnBackspace()
             return event  // Pass through
         }
@@ -510,13 +526,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.smartSwitchEnabled = smartSwitchEnabled
         
         engine.updateSettings(settings)
-        
-        // Always log macro status for debugging
-        debugLogCallback?("✅ updateEngineSettings: macroEnabled=\(macroEnabled), vUseMacro=\(engine.vUseMacro), macroInEnglishMode=\(macroInEnglishMode), vUseMacroInEnglishMode=\(engine.vUseMacroInEnglishMode), autoCapsMacro=\(autoCapsMacro), vAutoCapsMacro=\(engine.vAutoCapsMacro)")
-        
-        #if DEBUG
-        debugLogCallback?("✅ updateEngineSettings: inputMethod=\(inputMethod.displayName), vInputType=\(engine.vInputType), vAllowConsonantZFWJ=\(engine.vAllowConsonantZFWJ)")
-        #endif
         
         // Update macro manager
         macroManager.setCodeTable(codeTable.rawValue)

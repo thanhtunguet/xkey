@@ -40,7 +40,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Get the macro manager for external access
     func getMacroManager() -> MacroManager? {
+        if keyboardHandler == nil {
+            logToDebugWindow("⚠️ AppDelegate.getMacroManager: keyboardHandler is nil!")
+            return nil
+        }
         return keyboardHandler?.getMacroManager()
+    }
+    
+    /// Log message to debug window (for external access)
+    func logToDebugWindow(_ message: String) {
+        debugWindowController?.logEvent(message)
     }
 
     // MARK: - Application Lifecycle
@@ -113,29 +122,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let preferences = PreferencesManager.shared.loadPreferences()
         let shouldShowDebug = preferences.debugModeEnabled
         
-        #if DEBUG
-        // Always show in debug builds
-        debugWindowController = DebugWindowController()
-        debugWindowController?.showWindow(nil)
-        debugWindowController?.logEvent("✅ Debug window created (DEBUG build)")
-        
-        // Setup read word callback
-        debugWindowController?.setupReadWordCallback { [weak self] in
-            self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
-        }
-        #else
-        // Show in production only if enabled in settings
+        // Show debug window only if enabled in settings
         if shouldShowDebug {
             debugWindowController = DebugWindowController()
             debugWindowController?.showWindow(nil)
-            debugWindowController?.logEvent("✅ Debug window created (Production - enabled in settings)")
+            debugWindowController?.logEvent("✅ Debug window created (enabled in settings)")
             
             // Setup read word callback
             debugWindowController?.setupReadWordCallback { [weak self] in
                 self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
             }
         }
-        #endif
     }
 
     private func setupKeyboardHandling() {
@@ -317,7 +314,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardHandler?.tempOffEngineEnabled = preferences.tempOffEngineEnabled
         
         // Apply macro settings
-        debugWindowController?.logEvent("📦 Applying macro settings: macroEnabled=\(preferences.macroEnabled)")
         keyboardHandler?.macroEnabled = preferences.macroEnabled
         keyboardHandler?.macroInEnglishMode = preferences.macroInEnglishMode
         keyboardHandler?.autoCapsMacro = preferences.autoCapsMacro
@@ -350,14 +346,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Debug Window Management
     
     private func toggleDebugWindow(enabled: Bool) {
-        #if DEBUG
-        // In debug builds, always keep debug window visible
-        if debugWindowController == nil {
-            setupDebugWindow()
-        }
-        debugWindowController?.logEvent("ℹ️ Debug mode setting changed to: \(enabled) (ignored in DEBUG build)")
-        #else
-        // In production builds, respect the setting
+        // Respect the debug mode setting
         if enabled {
             // Enable debug window
             if debugWindowController == nil {
@@ -375,7 +364,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugWindowController = nil
             }
         }
-        #endif
     }
     
     // MARK: - Permissions

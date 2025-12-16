@@ -8,6 +8,11 @@
 import Foundation
 import AppKit
 
+// Notification name for macro changes
+extension Notification.Name {
+    static let macrosDidChange = Notification.Name("XKey.macrosDidChange")
+}
+
 struct MacroItem: Identifiable, Codable {
     let id: UUID
     let text: String
@@ -23,37 +28,44 @@ struct MacroItem: Identifiable, Codable {
 class MacroManagementViewModel: ObservableObject {
     @Published var macros: [MacroItem] = []
     
-    private var macroManager: MacroManager?
     private let userDefaultsKey = "XKey.Macros"
     
-    // Get macro manager from app delegate
-    private func getMacroManager() -> MacroManager {
-        if macroManager == nil {
-            // Try to get from AppDelegate
-            if let appDelegate = NSApplication.shared.delegate as? AppDelegate,
-               let manager = appDelegate.getMacroManager() {
-                macroManager = manager
-            } else {
-                // Fallback: create new instance
-                macroManager = MacroManager()
+    // Get app delegate
+    private func getAppDelegate() -> AppDelegate? {
+        if Thread.isMainThread {
+            return NSApplication.shared.delegate as? AppDelegate
+        } else {
+            var result: AppDelegate?
+            DispatchQueue.main.sync {
+                result = NSApplication.shared.delegate as? AppDelegate
             }
+            return result
         }
-        return macroManager!
+    }
+    
+    // Get macro manager from app delegate - always get fresh reference
+    private func getMacroManager() -> MacroManager? {
+        return getAppDelegate()?.getMacroManager()
+    }
+    
+    // Log to debug window
+    private func log(_ message: String) {
+        getAppDelegate()?.logToDebugWindow(message)
     }
     
     // MARK: - Load/Save
     
     func loadMacros() {
-        let manager = getMacroManager()
-        
         // Load from UserDefaults
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
            let decoded = try? JSONDecoder().decode([MacroItem].self, from: data) {
             macros = decoded
             
-            // Sync to MacroManager
-            for macro in macros {
-                _ = manager.addMacro(text: macro.text, content: macro.content)
+            // Sync to MacroManager (if available)
+            if let manager = getMacroManager() {
+                for macro in macros {
+                    _ = manager.addMacro(text: macro.text, content: macro.content)
+                }
             }
         }
     }
@@ -67,10 +79,11 @@ class MacroManagementViewModel: ObservableObject {
     // MARK: - CRUD Operations
     
     func addMacro(text: String, content: String) -> Bool {
-        let manager = getMacroManager()
+        log("📝 addMacro called: '\(text)' → '\(content)'")
         
         // Check if already exists
         if macros.contains(where: { $0.text == text }) {
+            log("   ❌ Macro '\(text)' already exists")
             return false
         }
         
@@ -78,36 +91,47 @@ class MacroManagementViewModel: ObservableObject {
         macros.append(macro)
         macros.sort { $0.text < $1.text }
         
-        // Add to manager
-        _ = manager.addMacro(text: text, content: content)
-        
+        // Save to UserDefaults first
         saveMacros()
+        
+        // Always post notification to ensure engine reloads macros
+        log("   📢 Posting macrosDidChange notification...")
+        NotificationCenter.default.post(name: .macrosDidChange, object: nil)
+        
         return true
     }
     
     func deleteMacro(_ macro: MacroItem) {
-        let manager = getMacroManager()
-        
+        log("🗑️ deleteMacro called: '\(macro.text)'")
         macros.removeAll { $0.id == macro.id }
         
-        // Delete from manager
-        _ = manager.deleteMacro(text: macro.text)
-        
+        // Save to UserDefaults first
         saveMacros()
+        
+        // Always post notification to ensure engine reloads macros
+        log("   📢 Posting macrosDidChange notification...")
+        NotificationCenter.default.post(name: .macrosDidChange, object: nil)
     }
     
     func clearAll() {
-        let manager = getMacroManager()
-        
+        log("🗑️ clearAll called")
         macros.removeAll()
-        manager.clearAll()
+        
+        // Save to UserDefaults first
         saveMacros()
+        
+        // Always post notification to ensure engine reloads macros
+        log("   📢 Posting macrosDidChange notification...")
+        NotificationCenter.default.post(name: .macrosDidChange, object: nil)
     }
     
     // MARK: - Import/Export
     
     func importMacros() {
-        let manager = getMacroManager()
+        guard let manager = getMacroManager() else {
+            showAlert(title: "Lỗi", message: "Không thể kết nối với MacroManager")
+            return
+        }
         
         let panel = NSOpenPanel()
         panel.title = "Import Macros"
@@ -137,7 +161,10 @@ class MacroManagementViewModel: ObservableObject {
     }
     
     func exportMacros() {
-        let manager = getMacroManager()
+        guard let manager = getMacroManager() else {
+            showAlert(title: "Lỗi", message: "Không thể kết nối với MacroManager")
+            return
+        }
         
         let panel = NSSavePanel()
         panel.title = "Export Macros"

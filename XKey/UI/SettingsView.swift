@@ -512,7 +512,7 @@ struct MacroSettingsSection: View {
                 // Add new macro
                 SettingsGroup(title: "Thêm macro mới") {
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 12) {
+                        HStack(alignment: .bottom, spacing: 12) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Từ viết tắt")
                                     .font(.caption)
@@ -618,6 +618,11 @@ struct MacroSettingsSection: View {
         
         guard !trimmedText.isEmpty && !trimmedContent.isEmpty else {
             showErrorMessage("Vui lòng nhập đầy đủ thông tin")
+            return
+        }
+        
+        guard trimmedText.count >= 2 else {
+            showErrorMessage("Từ viết tắt phải có ít nhất 2 ký tự")
             return
         }
         

@@ -33,20 +33,9 @@ extension VNEngine {
     /// Called when word break or space is pressed
     /// - Returns: true if macro was found and replaced
     func findAndReplaceMacro() -> Bool {
-        guard shouldUseMacro() else { 
-            logCallback?("Macro: shouldUseMacro() returned false (vUseMacro=\(vUseMacro), vLanguage=\(vLanguage), vUseMacroInEnglishMode=\(vUseMacroInEnglishMode))")
-            return false 
-        }
-        guard !hookState.macroKey.isEmpty else { 
-            logCallback?("Macro: macroKey is empty")
-            return false 
-        }
-        guard !hasHandledMacro else { 
-            logCallback?("Macro: already handled")
-            return false 
-        }
-        
-        logCallback?("Macro: searching for key with \(hookState.macroKey.count) chars")
+        guard shouldUseMacro() else { return false }
+        guard !hookState.macroKey.isEmpty else { return false }
+        guard !hasHandledMacro else { return false }
         
         // Try to find macro
         if let macroContent = macroManager.findMacro(key: hookState.macroKey) {
@@ -64,8 +53,6 @@ extension VNEngine {
             hookState.macroData = macroContent
             
             hasHandledMacro = true
-            logCallback?("Macro found: '\(hookState.macroKey)' → \(macroContent.count) chars")
-            
             return true
         }
         

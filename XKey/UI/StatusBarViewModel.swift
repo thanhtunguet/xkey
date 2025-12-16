@@ -41,9 +41,7 @@ class StatusBarViewModel: ObservableObject {
     }
     
     private func log(_ message: String) {
-        #if DEBUG
         debugLogCallback?(message)
-        #endif
     }
     
     func toggleVietnamese() {

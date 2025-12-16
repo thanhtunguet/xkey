@@ -307,13 +307,20 @@ struct VowelSequenceValidator {
             let hasConsonantSuffix = sequencesWithConsonantSuffix.contains(vowels)
 
             if hasConsonantSuffix {
-                // Special case: Modern Style for oa, oe, uy (Specification Rule 2)
+                // Special case: Modern Style for oa, oe (Specification Rule 2)
                 // Modern Style ONLY applies when there IS an ending consonant
                 // Examples: 
                 //   "hoan" → "hoán" (has ending consonant 'n' → tone on 'a')
                 //   "hoa" → "hóa" (no ending consonant → tone on 'o')
-                if modernStyle && hasEndingConsonant && (vowels == [.o, .a] || vowels == [.o, .e] || vowels == [.u, .y]) {
+                if modernStyle && hasEndingConsonant && (vowels == [.o, .a] || vowels == [.o, .e]) {
                     return 1
+                }
+                
+                // Special case: Modern Style for uy - ALWAYS tone on 'y'
+                // Modern style: tuý, huý, quý (tone on 'y')
+                // Old style: túy, húy, qúy (tone on 'u')
+                if modernStyle && vowels == [.u, .y] {
+                    return 1  // Tone on 'y'
                 }
                 
                 // Old Style logic (default):

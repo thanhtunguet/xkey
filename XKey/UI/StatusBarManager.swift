@@ -13,9 +13,7 @@ class StatusBarManager: ObservableObject {
     private var statusItem: NSStatusItem?
     let viewModel: StatusBarViewModel
     private var menuBarIconStyle: MenuBarIconStyle = .x
-    #if DEBUG
     weak var debugWindowController: DebugWindowController?
-    #endif
     
     init(keyboardHandler: KeyboardEventHandler?, eventTapManager: EventTapManager?) {
         self.viewModel = StatusBarViewModel(
@@ -27,18 +25,14 @@ class StatusBarManager: ObservableObject {
     }
     
     private func log(_ message: String) {
-        #if DEBUG
         debugWindowController?.logEvent(message)
-        #endif
     }
     
     func setupStatusBar() {
         // Connect viewModel's debug callback to our debugWindowController
-        #if DEBUG
         viewModel.debugLogCallback = { [weak self] message in
             self?.debugWindowController?.logEvent(message)
         }
-        #endif
         
         // Create status item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -199,18 +193,6 @@ class StatusBarManager: ObservableObject {
         )
         prefsItem.target = self
         
-        #if DEBUG
-        menu.addItem(.separator())
-        
-        // Debug Window
-        let debugItem = menu.addItem(
-            withTitle: "Mở Debug Window",
-            action: #selector(openDebugWindow),
-            keyEquivalent: "d"
-        )
-        debugItem.target = self
-        #endif
-        
         menu.addItem(.separator())
         
         // Quit
@@ -321,13 +303,6 @@ class StatusBarManager: ObservableObject {
     @objc private func quit() {
         viewModel.quit()
     }
-    
-    #if DEBUG
-    @objc private func openDebugWindow() {
-        debugWindowController?.showWindow(nil)
-        NSApp.activate(ignoringOtherApps: true)
-    }
-    #endif
     
     private func convertToNSEventModifiers(_ modifiers: EventModifiers) -> NSEvent.ModifierFlags {
         var flags: NSEvent.ModifierFlags = []

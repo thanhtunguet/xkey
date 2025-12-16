@@ -432,11 +432,9 @@ class VNEngine {
         }
         
         // Insert or replace key for macro
-        logCallback?("🔑 Macro check: keyCode=\(keyCode), vUseMacro=\(vUseMacro), hookState.code=\(hookState.code)")
         if vUseMacro == 1 {
             if hookState.code == UInt8(vDoNothing) {
                 hookState.macroKey.append(UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0))
-                logCallback?("  → Added to macroKey, count=\(hookState.macroKey.count)")
             } else if hookState.code == UInt8(vWillProcess) || hookState.code == UInt8(vRestore) {
                 for _ in 0..<hookState.backspaceCount {
                     if !hookState.macroKey.isEmpty {
@@ -1767,9 +1765,9 @@ class VNEngine {
                 vowelWillSetMark = vowelStartIndex + 1
                 hookState.backspaceCount = UInt8(Int(index) - vowelWillSetMark)
             }
-            // uy -> mark on 'u' (modern orthography: tùy, quý, thúy)
+            // uy -> mark on 'y' (modern orthography: tuý, quý, thuý)
             else if v1 == VietnameseData.KEY_U && v2 == VietnameseData.KEY_Y {
-                vowelWillSetMark = vowelStartIndex
+                vowelWillSetMark = vowelStartIndex + 1  // Đặt dấu vào 'y' cho kiểu hiện đại
                 hookState.backspaceCount = UInt8(Int(index) - vowelWillSetMark)
             }
             // If 2nd vowel is 'o' or 'u' -> mark on 1st vowel
@@ -1901,6 +1899,17 @@ class VNEngine {
             hookState.backspaceCount = UInt8(Int(index) - vowelWillSetMark)
         }
         
+        // Rule for "uy" in old style: mark on 'u' (úy)
+        // Old style: túy, húy, qúy
+        if vowelCount == 2 {
+            let v1 = chr(vowelStartIndex)
+            let v2 = chr(vowelStartIndex + 1)
+            if v1 == VietnameseData.KEY_U && v2 == VietnameseData.KEY_Y {
+                vowelWillSetMark = vowelStartIndex  // Đặt dấu vào 'u' cho kiểu cũ
+                hookState.backspaceCount = UInt8(Int(index) - vowelWillSetMark)
+            }
+        }
+        
         // Rule 3: For vowels with circumflex/horn (ê, ơ) - tone goes on that vowel
         // This handles: iê (hiện), yê (yến), ươ (người)
         // IMPORTANT: Only check ê and ơ - NOT ư or ô!
@@ -1998,7 +2007,6 @@ class VNEngine {
     
     func saveWord() {
         if hookState.code == UInt8(vReplaceMacro) {
-            logCallback?("saveWord: skipped (macro replacement)")
             return
         }
         
@@ -2422,14 +2430,9 @@ extension VNEngine {
     /// Process word break (space, punctuation, etc.)
     /// Returns ProcessResult with macro replacement if found
     func processWordBreak(character: Character) -> ProcessResult {
-        logCallback?("🔍 processWordBreak: char='\(character)', vUseMacro=\(vUseMacro), macroKey.count=\(hookState.macroKey.count), hasHandledMacro=\(hasHandledMacro)")
-        logCallback?("processWordBreak: char='\(character)', vUseMacro=\(vUseMacro), index=\(index), buffer=\(getCurrentWord())")
-        
         // Check macro before resetting
         if shouldUseMacro() && !hasHandledMacro {
-            logCallback?("  → Checking macro, macroKey has \(hookState.macroKey.count) chars")
             if findAndReplaceMacro() {
-                logCallback?("  → Macro found! backspace=\(hookState.backspaceCount), newChars=\(hookState.newCharCount)")
                 let result = convertHookStateToResult(hookState, currentKeyCode: nil, currentCharacter: character, isUppercase: false)
                 // Reset after macro replacement
                 reset()
@@ -2443,18 +2446,15 @@ extension VNEngine {
         
         // If we already have spaces saved, save them first
         if spaceCount > 0 {
-            logCallback?("  → Saving previous spaces: count=\(spaceCount)")
             saveWord(keyCode: VietnameseData.KEY_SPACE, count: spaceCount)
             spaceCount = 0
         }
         
         // Save current word
-        logCallback?("  → Saving current word...")
         saveWord()
         
         // Increment space count for the current space
         spaceCount = 1
-        logCallback?("  → Set spaceCount=1, typingStates.count=\(typingStates.count)")
         
         // Start new session but DON'T clear typingStates
         startNewSession()

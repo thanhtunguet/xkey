@@ -72,6 +72,9 @@ class MacroManager {
         return macroMap[key] != nil
     }
     
+    /// Logging callback for debug
+    var logCallback: ((String) -> Void)?
+    
     /// Find macro by key and return content
     func findMacro(key: [UInt32]) -> [UInt32]? {
         // Convert key to character codes
@@ -239,6 +242,8 @@ class MacroManager {
         }
         
         // It's a keyCode - convert to character
+        // Note: data may contain VNEngine masks (TONE_MASK, MARK_MASK, etc.)
+        // We only care about the lower 16 bits for keyCode
         let keyCode = UInt16(data & 0xFFFF)
         let isCaps = (data & 0x10000) != 0  // CAPS_MASK
         
@@ -260,6 +265,8 @@ class MacroManager {
                 return UInt32(scalar.value)
             }
         }
+        
+        logCallback?("⚠️ getCharacterCode: Unknown keyCode=0x\(String(format: "%X", keyCode)) from data=0x\(String(format: "%X", data))")
         
         // Fallback - return as is
         return data & 0xFFFF
