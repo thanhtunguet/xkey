@@ -45,7 +45,7 @@ class MacroManager {
     /// Add or update a macro
     func addMacro(text: String, content: String) -> Bool {
         let key = convertStringToKey(text)
-        var contentCode = convertStringToCode(content)
+        let contentCode = convertStringToCode(content)
         
         macroMap[key] = MacroData(
             macroText: text,
@@ -75,52 +75,65 @@ class MacroManager {
     /// Find macro by key and return content
     func findMacro(key: [UInt32]) -> [UInt32]? {
         // Convert key to character codes
-        var searchKey = key.map { getCharacterCode($0) }
-        
-        // Debug: print search key as string
-        let searchStr = searchKey.compactMap { UnicodeScalar($0) }.map { String(Character($0)) }.joined()
-        print("MacroManager.findMacro: searching for '\(searchStr)' (codes: \(searchKey))")
-        print("MacroManager: available macros: \(macroMap.keys.map { $0.compactMap { UnicodeScalar($0) }.map { String(Character($0)) }.joined() })")
+        let searchKey = key.map { getCharacterCode($0) }
         
         // Try exact match first
         if let macro = macroMap[searchKey] {
-            print("MacroManager: FOUND macro!")
             return macro.macroContentCode
         }
         
         // Try with auto caps if enabled
-        if vAutoCapsMacro {
-            var allCapsFlag = false
+        if vAutoCapsMacro && !searchKey.isEmpty {
+            // Check if first character is uppercase
+            let firstCharWasUppercase = isUppercaseChar(searchKey[0])
             
-            // Check if second character onwards are uppercase
-            if searchKey.count > 1 {
-                allCapsFlag = modifyCaseUnicode(&searchKey[1], isUpperCase: false)
-                for i in 2..<searchKey.count {
-                    _ = modifyCaseUnicode(&searchKey[i], isUpperCase: false)
+            // Check if ALL characters are uppercase (for ALL CAPS case like "BTW")
+            var allCapsFlag = true
+            for i in 0..<searchKey.count {
+                if !isUppercaseChar(searchKey[i]) {
+                    allCapsFlag = false
+                    break
                 }
             }
             
-            // Convert first character to lowercase
-            if searchKey.count > 0 {
-                if modifyCaseUnicode(&searchKey[0], isUpperCase: false) {
-                    // Found macro with lowercase
-                    if let macro = macroMap[searchKey] {
-                        var result = macro.macroContentCode
-                        
-                        // Apply caps to result
-                        for i in 0..<result.count {
-                            if i == 0 || allCapsFlag {
-                                _ = modifyCaseUnicode(&result[i], isUpperCase: true)
-                            }
-                        }
-                        
-                        return result
+            // Convert all characters to lowercase for search
+            var lowercaseKey = searchKey
+            for i in 0..<lowercaseKey.count {
+                _ = modifyCaseUnicode(&lowercaseKey[i], isUpperCase: false)
+            }
+            
+            // Try to find macro with lowercase key
+            if let macro = macroMap[lowercaseKey] {
+                var result = macro.macroContentCode
+                
+                // Apply caps to result based on input case
+                if allCapsFlag {
+                    // ALL CAPS input -> ALL CAPS output
+                    for i in 0..<result.count {
+                        _ = modifyCaseUnicode(&result[i], isUpperCase: true)
+                    }
+                } else if firstCharWasUppercase {
+                    // First char uppercase -> capitalize first char of result
+                    if !result.isEmpty {
+                        _ = modifyCaseUnicode(&result[0], isUpperCase: true)
                     }
                 }
+                
+                return result
             }
         }
         
         return nil
+    }
+    
+    /// Check if a character code represents an uppercase letter
+    private func isUppercaseChar(_ code: UInt32) -> Bool {
+        let charValue = code & 0xFFFF
+        if let scalar = UnicodeScalar(charValue) {
+            let char = Character(scalar)
+            return char.isUppercase
+        }
+        return false
     }
     
     /// Get all macros
@@ -255,23 +268,17 @@ class MacroManager {
     private func modifyCaseUnicode(_ code: inout UInt32, isUpperCase: Bool) -> Bool {
         let charBuff = code
         
-        if (code & 0x2000000) == 0 {
-            // Normal char
-            if isUpperCase {
-                code |= 0x10000  // CAPS_MASK
-            } else {
-                code &= ~0x10000
-            }
-            return code != charBuff
-        }
-        
-        // Unicode character - simple case conversion
+        // Get the actual character value (remove any flags)
         let charValue = code & 0xFFFF
+        
+        // Convert to character and change case
         if let scalar = UnicodeScalar(charValue) {
             let char = Character(scalar)
             let converted = isUpperCase ? char.uppercased() : char.lowercased()
             if let newScalar = converted.unicodeScalars.first {
-                code = UInt32(newScalar.value) | 0x2000000
+                // Preserve the 0x2000000 flag if it was set
+                let flags = code & 0xFFFF0000
+                code = UInt32(newScalar.value) | flags
                 return code != charBuff
             }
         }

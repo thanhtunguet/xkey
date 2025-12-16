@@ -176,7 +176,7 @@ class VNEngine {
         hookState.extCode = 1 // word break
         
         // Check macro
-        if vUseMacro == 1 && isMacroBreakCode(keyCode: keyCode) && !hasHandledMacro {
+        if shouldUseMacro() && isMacroBreakCode(keyCode: keyCode) && !hasHandledMacro {
             _ = findAndReplaceMacro()
         }
         
@@ -248,7 +248,7 @@ class VNEngine {
         }
         
         // Check macro first - if found, return early
-        if vUseMacro == 1 && !hasHandledMacro {
+        if shouldUseMacro() && !hasHandledMacro {
             if findAndReplaceMacro() {
                 // Macro found and replaced - clear macro key and return
                 hookState.macroKey.removeAll()
@@ -432,9 +432,11 @@ class VNEngine {
         }
         
         // Insert or replace key for macro
+        logCallback?("🔑 Macro check: keyCode=\(keyCode), vUseMacro=\(vUseMacro), hookState.code=\(hookState.code)")
         if vUseMacro == 1 {
             if hookState.code == UInt8(vDoNothing) {
                 hookState.macroKey.append(UInt32(keyCode) | (isCaps ? VNEngine.CAPS_MASK : 0))
+                logCallback?("  → Added to macroKey, count=\(hookState.macroKey.count)")
             } else if hookState.code == UInt8(vWillProcess) || hookState.code == UInt8(vRestore) {
                 for _ in 0..<hookState.backspaceCount {
                     if !hookState.macroKey.isEmpty {
@@ -2420,10 +2422,11 @@ extension VNEngine {
     /// Process word break (space, punctuation, etc.)
     /// Returns ProcessResult with macro replacement if found
     func processWordBreak(character: Character) -> ProcessResult {
+        logCallback?("🔍 processWordBreak: char='\(character)', vUseMacro=\(vUseMacro), macroKey.count=\(hookState.macroKey.count), hasHandledMacro=\(hasHandledMacro)")
         logCallback?("processWordBreak: char='\(character)', vUseMacro=\(vUseMacro), index=\(index), buffer=\(getCurrentWord())")
         
         // Check macro before resetting
-        if vUseMacro == 1 && !hasHandledMacro {
+        if shouldUseMacro() && !hasHandledMacro {
             logCallback?("  → Checking macro, macroKey has \(hookState.macroKey.count) chars")
             if findAndReplaceMacro() {
                 logCallback?("  → Macro found! backspace=\(hookState.backspaceCount), newChars=\(hookState.newCharCount)")

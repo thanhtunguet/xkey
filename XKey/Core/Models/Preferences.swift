@@ -54,7 +54,7 @@ struct Preferences: Codable {
     var debugModeEnabled: Bool = false           // Show debug window (even in production)
     
     // UI settings
-    var showStatusBarIcon: Bool = true
+    var showDockIcon: Bool = false               // Show icon in Dock (menu bar always visible)
     var startAtLogin: Bool = false
     var menuBarIconStyle: MenuBarIconStyle = .x  // Icon style for menubar
 }

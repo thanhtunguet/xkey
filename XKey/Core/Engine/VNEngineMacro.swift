@@ -33,8 +33,8 @@ extension VNEngine {
     /// Called when word break or space is pressed
     /// - Returns: true if macro was found and replaced
     func findAndReplaceMacro() -> Bool {
-        guard vUseMacro == 1 else { 
-            logCallback?("Macro: vUseMacro is OFF")
+        guard shouldUseMacro() else { 
+            logCallback?("Macro: shouldUseMacro() returned false (vUseMacro=\(vUseMacro), vLanguage=\(vLanguage), vUseMacroInEnglishMode=\(vUseMacroInEnglishMode))")
             return false 
         }
         guard !hookState.macroKey.isEmpty else { 

@@ -70,7 +70,7 @@ struct SettingsView: View {
                 case .advanced:
                     AdvancedSettingsSection(viewModel: viewModel)
                 case .macro:
-                    MacroSettingsSection()
+                    MacroSettingsSection(prefsViewModel: viewModel)
                 case .convertTool:
                     ConvertToolSection()
                 case .appearance:
@@ -278,13 +278,8 @@ struct AppearanceSettingsSection: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                SettingsGroup(title: "Thanh trạng thái") {
+                SettingsGroup(title: "Thanh menu") {
                     VStack(alignment: .leading, spacing: 12) {
-                        Toggle("Hiển thị biểu tượng trên thanh trạng thái", isOn: $viewModel.preferences.showStatusBarIcon)
-                        
-                        Divider()
-                            .padding(.vertical, 4)
-                        
                         Text("Biểu tượng menubar:")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -300,6 +295,16 @@ struct AppearanceSettingsSection: View {
                             }
                         }
                         .padding(.leading, 8)
+                    }
+                }
+                
+                SettingsGroup(title: "Dock") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Hiển thị biểu tượng trên thanh Dock", isOn: $viewModel.preferences.showDockIcon)
+                        
+                        Text("Khi bật, XKey sẽ hiển thị icon trên Dock như các ứng dụng thông thường")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
@@ -481,108 +486,126 @@ struct AboutSettingsSection: View {
 
 struct MacroSettingsSection: View {
     @StateObject private var viewModel = MacroManagementViewModel()
+    @ObservedObject var prefsViewModel: PreferencesViewModel
     @State private var newMacroText: String = ""
     @State private var newMacroContent: String = ""
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Add new macro section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Thêm macro mới:")
-                    .font(.headline)
-                
-                HStack(alignment: .bottom, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Từ viết tắt:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("vd: btw", text: $newMacroText)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 120)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Settings Group
+                SettingsGroup(title: "Cài đặt Macro") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Toggle("Bật Macro", isOn: $prefsViewModel.preferences.macroEnabled)
+                        
+                        if prefsViewModel.preferences.macroEnabled {
+                            Toggle("Dùng macro trong chế độ tiếng Anh", isOn: $prefsViewModel.preferences.macroInEnglishMode)
+                                .padding(.leading, 20)
+                            Toggle("Tự động viết hoa macro", isOn: $prefsViewModel.preferences.autoCapsMacro)
+                                .padding(.leading, 20)
+                        }
                     }
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Nội dung thay thế:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        TextField("vd: by the way", text: $newMacroContent)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(minWidth: 200)
+                }
+                
+                // Add new macro
+                SettingsGroup(title: "Thêm macro mới") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Từ viết tắt")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                TextField("vd: btw", text: $newMacroText)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 120)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Nội dung thay thế")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                TextField("vd: by the way", text: $newMacroContent)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+                            
+                            Button("Thêm") {
+                                addMacro()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(newMacroText.isEmpty || newMacroContent.isEmpty)
+                        }
+                        
+                        if showError {
+                            Text(errorMessage)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
                     }
-                    
-                    Button("Thêm") {
-                        addMacro()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(newMacroText.isEmpty || newMacroContent.isEmpty)
                 }
                 
-                if showError {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-            }
-            .padding()
-            .background(Color.gray.opacity(0.05))
-            
-            Divider()
-            
-            // Macro list header
-            HStack {
-                Text("Danh sách macro (\(viewModel.macros.count)):")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Button("Import...") {
-                    viewModel.importMacros()
-                }
-                .buttonStyle(.borderless)
-                
-                Button("Export...") {
-                    viewModel.exportMacros()
-                }
-                .buttonStyle(.borderless)
-                
-                if !viewModel.macros.isEmpty {
-                    Button("Xóa tất cả") {
-                        viewModel.clearAll()
-                    }
-                    .foregroundColor(.red)
-                    .buttonStyle(.borderless)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 12)
-            
-            // Macro list
-            if viewModel.macros.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "text.badge.plus")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary)
-                    Text("Chưa có macro nào")
-                        .foregroundColor(.secondary)
-                    Text("Thêm macro để tự động thay thế text shortcuts")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(viewModel.macros) { macro in
-                            MacroRowCompact(macro: macro) {
-                                viewModel.deleteMacro(macro)
+                // Macro list
+                SettingsGroup(title: "Danh sách macro (\(viewModel.macros.count))") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Action buttons
+                        HStack(spacing: 12) {
+                            Button {
+                                viewModel.importMacros()
+                            } label: {
+                                Label("Import", systemImage: "square.and.arrow.down")
+                            }
+                            .buttonStyle(.bordered)
+                            
+                            Button {
+                                viewModel.exportMacros()
+                            } label: {
+                                Label("Export", systemImage: "square.and.arrow.up")
+                            }
+                            .buttonStyle(.bordered)
+                            
+                            Spacer()
+                            
+                            if !viewModel.macros.isEmpty {
+                                Button(role: .destructive) {
+                                    viewModel.clearAll()
+                                } label: {
+                                    Label("Xóa tất cả", systemImage: "trash")
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Macro list
+                        if viewModel.macros.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "text.badge.plus")
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.secondary)
+                                Text("Chưa có macro nào")
+                                    .foregroundColor(.secondary)
+                                Text("Thêm macro để tự động thay thế từ viết tắt")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else {
+                            LazyVStack(spacing: 8) {
+                                ForEach(viewModel.macros) { macro in
+                                    MacroRowCompact(macro: macro) {
+                                        viewModel.deleteMacro(macro)
+                                    }
+                                }
                             }
                         }
                     }
-                    .padding()
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
         }
         .onAppear {
             viewModel.loadMacros()
@@ -619,32 +642,50 @@ struct MacroSettingsSection: View {
 struct MacroRowCompact: View {
     let macro: MacroItem
     let onDelete: () -> Void
+    @State private var isHovered = false
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
+            // Shortcut text
             Text(macro.text)
                 .font(.system(.body, design: .monospaced))
-                .fontWeight(.medium)
+                .fontWeight(.semibold)
                 .foregroundColor(.accentColor)
-                .frame(width: 100, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.accentColor.opacity(0.1))
+                .cornerRadius(4)
+                .frame(minWidth: 80, alignment: .center)
             
+            // Arrow
             Image(systemName: "arrow.right")
                 .foregroundColor(.secondary)
-                .font(.caption)
+                .font(.system(size: 12, weight: .medium))
             
+            // Content
             Text(macro.content)
+                .foregroundColor(.primary)
+                .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
+            // Delete button
             Button(action: onDelete) {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.secondary)
+                Image(systemName: "trash")
+                    .font(.system(size: 12))
+                    .foregroundColor(isHovered ? .red : .secondary)
             }
             .buttonStyle(.plain)
+            .opacity(isHovered ? 1 : 0.5)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(isHovered ? Color.gray.opacity(0.1) : Color.gray.opacity(0.03))
+        .cornerRadius(8)
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
     }
 }
 

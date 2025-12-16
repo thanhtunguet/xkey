@@ -112,7 +112,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             #endif
         }
         
-        // Set up injector debug logging (works in both Debug and Release)
+        // Set up injector debug logging
         self.injector.debugCallback = { [weak self] message in
             self?.debugLogCallback?("💉 Injector: \(message)")
         }
@@ -153,16 +153,20 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     func toggleVietnamese() {
         isVietnameseEnabled.toggle()
+        // Update engine's vLanguage to match
+        engine.vLanguage = isVietnameseEnabled ? 1 : 0
         if !isVietnameseEnabled {
             engine.reset()
         }
         #if DEBUG
-        debugLogCallback?("Vietnamese input: \(isVietnameseEnabled ? "ON" : "OFF")")
+        debugLogCallback?("Vietnamese input: \(isVietnameseEnabled ? "ON" : "OFF"), vLanguage=\(engine.vLanguage)")
         #endif
     }
     
     func setVietnamese(_ enabled: Bool) {
         isVietnameseEnabled = enabled
+        // Update engine's vLanguage to match
+        engine.vLanguage = enabled ? 1 : 0
         if !enabled {
             engine.reset()
         }
@@ -171,11 +175,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     // MARK: - EventTapDelegate
     
     func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool {
-        debugLogCallback?("shouldProcessEvent: enabled=\(isVietnameseEnabled), type=\(type.rawValue)")
+        debugLogCallback?("shouldProcessEvent: enabled=\(isVietnameseEnabled), macroInEnglish=\(macroInEnglishMode), macroEnabled=\(macroEnabled), type=\(type.rawValue)")
 
-        // Only process key down events when Vietnamese is enabled
-        guard isVietnameseEnabled else {
-            debugLogCallback?("  → Vietnamese DISABLED")
+        // Check if we should process in English mode (for macro support)
+        let shouldProcessInEnglishMode = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
+        
+        // Only process key down events when Vietnamese is enabled OR macro in English mode is enabled
+        guard isVietnameseEnabled || shouldProcessInEnglishMode else {
+            debugLogCallback?("  → Vietnamese DISABLED and macro in English mode OFF")
             return false
         }
 
@@ -279,8 +286,11 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return handleBackspace(event: event, proxy: proxy)
         }
 
+        // Check if we're in English mode with macro support
+        let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
+        
         if isWordBreakKey(character) {
-            debugLogCallback?("  → WORD BREAK - checking macro first")
+            debugLogCallback?("  → WORD BREAK - checking macro first (englishMode=\(isEnglishModeWithMacro))")
             let result = engine.processWordBreak(character: character)
             
             // Check if macro was found and replaced
@@ -314,7 +324,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return event
         }
 
-        // Process through engine
+        // In English mode with macro, only accumulate macro keys without Vietnamese processing
+        if isEnglishModeWithMacro {
+            debugLogCallback?("  → English mode with macro - accumulating key for macro")
+            engine.addKeyToMacroBuffer(keyCode: keyCode, isCaps: isUppercase)
+            return event  // Pass through without Vietnamese processing
+        }
+
+        // Process through engine (Vietnamese mode)
         debugLogCallback?("  → Calling engine.processKey('\(character)')...")
         let result = engine.processKey(
             character: character,
@@ -376,6 +393,14 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     // MARK: - Special Key Handling
 
     private func handleBackspace(event: CGEvent, proxy: CGEventTapProxy) -> CGEvent? {
+        // In English mode with macro, only update macro buffer
+        let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
+        if isEnglishModeWithMacro {
+            debugLogCallback?("  → English mode with macro - updating macro buffer on backspace")
+            engine.updateMacroBufferOnBackspace()
+            return event  // Pass through
+        }
+        
         let result = engine.processBackspace()
 
         debugLogCallback?("  → Backspace result: shouldConsume=\(result.shouldConsume), bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
@@ -452,6 +477,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.smartSwitchEnabled = smartSwitchEnabled
         
         engine.updateSettings(settings)
+        
+        // Always log macro status for debugging
+        debugLogCallback?("✅ updateEngineSettings: macroEnabled=\(macroEnabled), vUseMacro=\(engine.vUseMacro), macroInEnglishMode=\(macroInEnglishMode), vUseMacroInEnglishMode=\(engine.vUseMacroInEnglishMode), autoCapsMacro=\(autoCapsMacro), vAutoCapsMacro=\(engine.vAutoCapsMacro)")
         
         #if DEBUG
         debugLogCallback?("✅ updateEngineSettings: inputMethod=\(inputMethod.displayName), vInputType=\(engine.vInputType), vAllowConsonantZFWJ=\(engine.vAllowConsonantZFWJ)")

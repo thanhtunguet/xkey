@@ -419,13 +419,8 @@ struct UISettingsTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                GroupBox("Thanh trạng thái") {
+                GroupBox("Thanh menu") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Hiển thị biểu tượng trên thanh trạng thái", isOn: $viewModel.preferences.showStatusBarIcon)
-                        
-                        Divider()
-                            .padding(.vertical, 4)
-                        
                         Text("Biểu tượng menubar:")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
@@ -441,6 +436,17 @@ struct UISettingsTab: View {
                             }
                         }
                         .padding(.leading, 8)
+                    }
+                    .padding(.vertical, 4)
+                }
+                
+                GroupBox("Dock") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Hiển thị biểu tượng trên thanh Dock", isOn: $viewModel.preferences.showDockIcon)
+                        
+                        Text("Khi bật, XKey sẽ hiển thị icon trên Dock như các ứng dụng thông thường")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                     .padding(.vertical, 4)
                 }

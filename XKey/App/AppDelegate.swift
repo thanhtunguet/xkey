@@ -317,6 +317,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardHandler?.tempOffEngineEnabled = preferences.tempOffEngineEnabled
         
         // Apply macro settings
+        debugWindowController?.logEvent("📦 Applying macro settings: macroEnabled=\(preferences.macroEnabled)")
         keyboardHandler?.macroEnabled = preferences.macroEnabled
         keyboardHandler?.macroInEnglishMode = preferences.macroInEnglishMode
         keyboardHandler?.autoCapsMacro = preferences.autoCapsMacro
@@ -336,6 +337,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Update menu bar icon style
         statusBarManager?.updateMenuBarIconStyle(preferences.menuBarIconStyle)
+        
+        // Update Dock icon visibility
+        updateDockIconVisibility(show: preferences.showDockIcon)
         
         // Update hotkey
         setupGlobalHotkey(with: preferences.toggleHotkey)
@@ -535,6 +539,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         debugWindowController?.logEvent("  ✅ App switch observer registered")
+    }
+    
+    // MARK: - Dock Icon
+    
+    private func updateDockIconVisibility(show: Bool) {
+        if show {
+            // Show Dock icon - regular app mode
+            NSApp.setActivationPolicy(.regular)
+            debugWindowController?.logEvent("🖥️ Dock icon: visible")
+        } else {
+            // Hide Dock icon - accessory/background app mode
+            NSApp.setActivationPolicy(.accessory)
+            debugWindowController?.logEvent("🖥️ Dock icon: hidden")
+        }
     }
     
     /// Handle Smart Switch when app changes
