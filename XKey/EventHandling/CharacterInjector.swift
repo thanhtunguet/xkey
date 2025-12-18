@@ -30,8 +30,6 @@ class CharacterInjector {
     // MARK: - Properties
     
     private var eventSource: CGEventSource?
-    private var isFirstWord: Bool = true  // Track if we're typing the first word
-    private var keystrokeCount: Int = 0   // Track number of keystrokes in current word
     private var isTypingMidSentence: Bool = false  // Track if user moved cursor (typing in middle of text)
     
     /// Semaphore to ensure injection completes before next keystroke is processed
@@ -52,22 +50,11 @@ class CharacterInjector {
         // Use .privateState to isolate injected events from system event state
         eventSource = CGEventSource(stateID: .privateState)
     }
-    
-    // MARK: - Word Tracking
-    
-    /// Reset first word flag (call when space/enter is pressed)
-    func resetFirstWord() {
-        isFirstWord = false
-        debugCallback?("Reset first word: isFirstWord=false")
-    }
-    
     /// Mark as new input session (call when cursor moves or new field focused)
     /// - Parameter cursorMoved: true if cursor was moved by user (mouse click or arrow keys)
     func markNewSession(cursorMoved: Bool = false) {
-        isFirstWord = true
-        keystrokeCount = 0
         isTypingMidSentence = cursorMoved  // If cursor moved, we're likely typing in middle of text
-        debugCallback?("New session: isFirstWord=true, keystrokeCount=0, isTypingMidSentence=\(cursorMoved)")
+        debugCallback?("New session: isTypingMidSentence=\(cursorMoved)")
     }
     
     /// Check if currently typing in middle of sentence (cursor was moved)
@@ -80,19 +67,6 @@ class CharacterInjector {
         isTypingMidSentence = false
         debugCallback?("Reset mid-sentence flag: isTypingMidSentence=false")
     }
-    
-    /// Reset keystroke count for new word (call when space/enter is pressed)
-    func resetKeystrokeCount() {
-        keystrokeCount = 0
-        debugCallback?("Reset keystroke count: keystrokeCount=0")
-    }
-    
-    /// Increment keystroke count (call after each keystroke)
-    func incrementKeystroke() {
-        keystrokeCount += 1
-        debugCallback?("Keystroke count: \(keystrokeCount)")
-    }
-    
     /// Wait for previous injection to complete (call BEFORE processing next keystroke)
     /// Uses semaphore to ensure 100% synchronization (better than cooldown timer)
     func waitForInjectionComplete() {
@@ -721,131 +695,6 @@ class CharacterInjector {
         debugCallback?("    → isSpotlight: Not Spotlight")
         return false
     }
-    
-    /// Check if currently focused element is Chrome address bar
-    private func isChromeAddressBar() -> Bool {
-        guard isChromiumBrowser() else {
-            return false
-        }
-        
-        let systemWideElement = AXUIElementCreateSystemWide()
-        
-        var focusedElement: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement) == .success else {
-            return false
-        }
-        
-        let element = focusedElement as! AXUIElement
-        
-        // Get role of focused element
-        var role: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role) == .success,
-              let roleString = role as? String else {
-            return false
-        }
-        
-        // Get subrole if available
-        var subrole: CFTypeRef?
-        let hasSubrole = AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole) == .success
-        let subroleString = subrole as? String
-        
-        // Get description if available
-        var description: CFTypeRef?
-        let hasDescription = AXUIElementCopyAttributeValue(element, kAXDescriptionAttribute as CFString, &description) == .success
-        let descriptionString = description as? String
-        
-        // Get identifier if available
-        var identifier: CFTypeRef?
-        let hasIdentifier = AXUIElementCopyAttributeValue(element, "AXIdentifier" as CFString, &identifier) == .success
-        let identifierString = identifier as? String
-        
-        debugCallback?("      [AX] Role: \(roleString)")
-        if let subroleString = subroleString {
-            debugCallback?("      [AX] Subrole: \(subroleString)")
-        }
-        if let descriptionString = descriptionString {
-            debugCallback?("      [AX] Description: \(descriptionString)")
-        }
-        if let identifierString = identifierString {
-            debugCallback?("      [AX] Identifier: \(identifierString)")
-        }
-        
-        // Chrome address bar typically has:
-        // - Role: AXTextField
-        // - Subrole: AXSearchField or contains "address" in description
-        // - Or identifier contains "omnibox"
-        
-        if roleString == kAXTextFieldRole as String {
-            // Check subrole
-            if let subroleString = subroleString, subroleString == "AXSearchField" {
-                debugCallback?("  [AX] Detected address bar (AXSearchField)")
-                return true
-            }
-            
-            // Check description
-            if let descriptionString = descriptionString?.lowercased(),
-               descriptionString.contains("address") || descriptionString.contains("url") {
-                debugCallback?("  [AX] Detected address bar (description)")
-                return true
-            }
-            
-            // Check identifier
-            if let identifierString = identifierString?.lowercased(),
-               identifierString.contains("omnibox") || identifierString.contains("address") {
-                debugCallback?("  [AX] Detected address bar (identifier)")
-                return true
-            }
-        }
-        
-        return false
-    }
-    
-    /// Check if we're in Chrome address bar (for special handling)
-    func isInChromeAddressBar() -> Bool {
-        return isChromeAddressBar()
-    }
-    
-    /// Get current keystroke count (for Chrome address bar detection)
-    func getKeystrokeCount() -> Int {
-        return keystrokeCount
-    }
-    
-    /// Check and fix duplicate BEFORE backspace (Chrome address bar fix ONLY)
-    func checkAndFixChromeAddressBarDuplicate(proxy: CGEventTapProxy) {
-        let isAddressBar = isChromeAddressBar()
-        
-        debugCallback?("    → Chrome fix check: isAddressBar=\(isAddressBar), isFirstWord=\(isFirstWord), keystrokeCount=\(keystrokeCount)")
-        
-        // Only apply fix for Chrome ADDRESS BAR, not content area
-        guard isAddressBar else {
-            debugCallback?("    → Chrome fix: Not address bar, skipping")
-            return
-        }
-        
-        // Only apply fix for FIRST WORD ONLY, starting from keystroke 2
-        // Chrome address bar duplicates characters in the first word only
-        // Subsequent words work normally
-        guard isFirstWord && keystrokeCount >= 2 else {
-            debugCallback?("    → Chrome fix: Wrong timing (need isFirstWord=true, keystrokeCount>=2)")
-            return
-        }
-        
-        debugCallback?("    → ✓ Chrome address bar fix: Applying fix at keystroke \(keystrokeCount) (FIRST WORD)")
-        
-        // Chrome duplicates injected characters in the first word
-        // For each keystroke after the first, we need to remove the duplicate
-        // Example:
-        // - Keystroke 1: "m" → Chrome has "mm" (original + injected)
-        // - Keystroke 2: "o" → Need to remove 1 duplicate "m" first
-        // - Keystroke 3: "a" → Need to remove 1 duplicate from previous injection
-        
-        debugCallback?("    → ✓ Chrome fix: Sending backspace to remove duplicate")
-        sendKeyPress(0x33, proxy: proxy) // Backspace to remove duplicate
-        usleep(2000) // 2ms delay after cleanup
-        
-        debugCallback?("    → ✓ Chrome fix: Duplicate removed")
-    }
-    
     // MARK: - Injection Method Detection
     
     /// Detect injection method based on frontmost app and focused element

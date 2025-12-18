@@ -443,10 +443,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                 // Send the word break character (space, etc.) after macro
                 // Don't consume - let it pass through
             }
-            
-            injector.resetFirstWord()  // Mark that we're no longer on first word
-            injector.resetKeystrokeCount()  // Reset keystroke count for next word
-            
             // NOTE: Do NOT reset mid-sentence flag on Enter/Return
             // When user presses Enter in the middle of text (e.g., line 2 of 3 lines),
             // there's still text on the right side. If we reset isTypingMidSentence,
@@ -477,21 +473,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             isUppercase: isUppercase
         )
         debugLogCallback?("  → Engine returned: shouldConsume=\(result.shouldConsume), bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
-        
-        // Increment keystroke count for Chrome duplicate detection
-        if result.shouldConsume {
-            injector.incrementKeystroke()
-        }
 
-        // Handle result
         if result.shouldConsume {
             debugLogCallback?("  → CONSUME: bs=\(result.backspaceCount) chars=\(result.newCharacters.count)")
-
-            // Chrome address bar fix: Check for duplicates BEFORE injection
-            debugLogCallback?("  → Calling Chrome address bar fix...")
-            injector.checkAndFixChromeAddressBarDuplicate(proxy: proxy)
-            debugLogCallback?("  → Chrome fix done")
-
             // Debug log
             if !result.newCharacters.isEmpty {
                 let chars = result.newCharacters.map { $0.unicode(codeTable: codeTable) }.joined()
