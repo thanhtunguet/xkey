@@ -303,33 +303,16 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Get physical key code
         let keyCode = event.keyCode
-        
-        // IMPORTANT: Convert physical keyCode to QWERTY character
-        // This ensures Vietnamese typing works on non-QWERTY layouts (QWERTZ, AZERTY, etc.)
-        // We cannot use event.charactersIgnoringModifiers because it returns the character
-        // based on the current keyboard layout, not the physical key position
-        // For example, on QWERTZ: physical key at position 0x06 (Z on QWERTY) returns 'y'
-        
-        // Determine if Shift is pressed (for uppercase and special characters)
-        let hasShiftModifier = event.flags.contains(.maskShift)
-        let hasCapsLock = event.flags.contains(.maskAlphaShift)
-        
-        // Get QWERTY character from physical key position
-        guard let qwertyCharacter = KeyCodeToCharacter.qwertyCharacter(keyCode: keyCode, withShift: hasShiftModifier) else {
-            // Not a printable character or not mapped
-            return event
-        }
-        
-        // Determine if uppercase:
-        // - For letters: Shift XOR Caps Lock (standard behavior)
-        // - For special characters: use Shift flag
-        let isLetter = qwertyCharacter.isLetter
-        let isUppercase = isLetter ? (hasShiftModifier != hasCapsLock) : hasShiftModifier
-        
-        // Use the QWERTY character for processing
-        let character = qwertyCharacter
 
-        debugLogCallback?("KEY: '\(character)' code=\(keyCode) (QWERTY)")
+        // Handle special keys BEFORE qwertyCharacter mapping
+        // These keys need special handling and don't need character conversion
+
+        // Handle Backspace/Delete
+        if keyCode == 0x33 {
+            debugLogCallback?("KEY: [BACKSPACE] code=\(keyCode)")
+            debugLogCallback?("  → BACKSPACE")
+            return handleBackspace(event: event, proxy: proxy)
+        }
 
         // Handle cursor movement keys - reset engine as focus might have changed
         let cursorMovementKeys: [CGKeyCode] = [
@@ -344,18 +327,34 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         ]
         
         if cursorMovementKeys.contains(keyCode) {
+            debugLogCallback?("KEY: [CURSOR] code=\(keyCode)")
             debugLogCallback?("  → CURSOR MOVEMENT - reset engine, mark mid-sentence")
             engine.reset()
             injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
             return event
         }
-        
+
         // Handle Tab key - reset engine and mid-sentence flag (new field)
         if keyCode == 0x30 { // Tab
+            debugLogCallback?("KEY: [TAB] code=\(keyCode)")
             debugLogCallback?("  → TAB - reset engine, new field")
             engine.reset()
             injector.markNewSession(cursorMoved: false)  // New field, not mid-sentence
             return event
+        }
+
+        // Handle Escape key
+        if keyCode == 0x35 { // Escape
+            debugLogCallback?("KEY: [ESC] code=\(keyCode)")
+            return event  // Pass through
+        }
+
+        // Handle Forward Delete (Fn+Delete)
+        if keyCode == 0x75 { // Forward Delete
+            debugLogCallback?("KEY: [FWD DELETE] code=\(keyCode)")
+            engine.reset()
+            injector.markNewSession()
+            return event  // Pass through
         }
         
         // Handle undo typing key (single key, no modifiers)
@@ -391,15 +390,36 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             // If nothing to undo, fall through to normal processing
         }
 
-        // Handle special keys
-        if keyCode == 0x33 { // Delete/Backspace
-            debugLogCallback?("  → BACKSPACE")
-            return handleBackspace(event: event, proxy: proxy)
+        // IMPORTANT: Convert physical keyCode to QWERTY character
+        // This ensures Vietnamese typing works on non-QWERTY layouts (QWERTZ, AZERTY, etc.)
+        // We cannot use event.charactersIgnoringModifiers because it returns the character
+        // based on the current keyboard layout, not the physical key position
+        // For example, on QWERTZ: physical key at position 0x06 (Z on QWERTY) returns 'y'
+
+        // Determine if Shift is pressed (for uppercase and special characters)
+        let hasShiftModifier = event.flags.contains(.maskShift)
+        let hasCapsLock = event.flags.contains(.maskAlphaShift)
+
+        // Get QWERTY character from physical key position
+        guard let qwertyCharacter = KeyCodeToCharacter.qwertyCharacter(keyCode: keyCode, withShift: hasShiftModifier) else {
+            // Not a printable character or not mapped
+            return event
         }
+
+        // Determine if uppercase:
+        // - For letters: Shift XOR Caps Lock (standard behavior)
+        // - For special characters: use Shift flag
+        let isLetter = qwertyCharacter.isLetter
+        let isUppercase = isLetter ? (hasShiftModifier != hasCapsLock) : hasShiftModifier
+
+        // Use the QWERTY character for processing
+        let character = qwertyCharacter
+
+        debugLogCallback?("KEY: '\(character)' code=\(keyCode) (QWERTY)")
 
         // Check if we're in English mode with macro support
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
-        
+
         if isWordBreakKey(character) {
             let result = engine.processWordBreak(character: character)
             

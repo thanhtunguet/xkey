@@ -50,8 +50,25 @@ class KeyCodeToCharacter {
             0x2C: "/",  // Slash
             
             // Special keys
-            0x31: " ",  // Space
-            0x32: "`"   // Backtick/Grave
+            0x31: " ",     // Space
+            0x32: "`",     // Backtick/Grave
+            0x24: "\r",    // Return/Enter
+            0x33: "\u{08}", // Backspace/Delete
+            0x30: "\t",    // Tab
+            0x35: "\u{1B}", // Escape
+            0x75: "\u{7F}", // Forward Delete (Fn+Delete)
+
+            // Arrow keys
+            0x7B: "\u{2190}", // Left Arrow ←
+            0x7C: "\u{2192}", // Right Arrow →
+            0x7D: "\u{2193}", // Down Arrow ↓
+            0x7E: "\u{2191}", // Up Arrow ↑
+
+            // Navigation keys
+            0x73: "\u{2196}", // Home ↖
+            0x77: "\u{2198}", // End ↘
+            0x74: "\u{21DE}", // Page Up ⇞
+            0x79: "\u{21DF}"  // Page Down ⇟
         ]
         
         // With Shift
@@ -85,8 +102,25 @@ class KeyCodeToCharacter {
             0x2C: "?",  // Slash → ?
             
             // Special keys (shifted)
-            0x31: " ",  // Space (unchanged)
-            0x32: "~"   // ` → ~
+            0x31: " ",     // Space (unchanged)
+            0x32: "~",     // ` → ~
+            0x24: "\r",    // Return/Enter (unchanged)
+            0x33: "\u{08}", // Backspace/Delete (unchanged)
+            0x30: "\t",    // Tab (unchanged)
+            0x35: "\u{1B}", // Escape (unchanged)
+            0x75: "\u{7F}", // Forward Delete (unchanged)
+
+            // Arrow keys (unchanged)
+            0x7B: "\u{2190}", // Left Arrow ←
+            0x7C: "\u{2192}", // Right Arrow →
+            0x7D: "\u{2193}", // Down Arrow ↓
+            0x7E: "\u{2191}", // Up Arrow ↑
+
+            // Navigation keys (unchanged)
+            0x73: "\u{2196}", // Home ↖
+            0x77: "\u{2198}", // End ↘
+            0x74: "\u{21DE}", // Page Up ⇞
+            0x79: "\u{21DF}"  // Page Down ⇟
         ]
         
         if withShift {

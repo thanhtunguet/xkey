@@ -738,7 +738,7 @@ class VNEngine {
         
         var isCorrect = false
         var isChanged = false
-        
+
         for charset in charsets {
             if Int(index) < charset.count {
                 continue
