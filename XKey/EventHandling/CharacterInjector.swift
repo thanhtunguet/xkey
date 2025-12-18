@@ -766,9 +766,54 @@ class CharacterInjector {
         }
         
         // Browser address bars (AXTextField with autocomplete)
-        let browsers = ["com.google.Chrome", "com.apple.Safari", "company.thebrowser.Browser",
-                        "com.brave.Browser", "com.microsoft.edgemac", "org.mozilla.firefox", 
-                        "com.operasoftware.Opera", "com.vivaldi.Vivaldi"]
+        let browsers = [
+            // Chromium-based
+            "com.google.Chrome",
+            "com.google.Chrome.canary",
+            "com.google.Chrome.beta",
+            "org.chromium.Chromium",
+            "com.brave.Browser",
+            "com.brave.Browser.beta",
+            "com.brave.Browser.nightly",
+            "com.microsoft.edgemac",
+            "com.microsoft.edgemac.Beta",
+            "com.microsoft.edgemac.Dev",
+            "com.microsoft.edgemac.Canary",
+            "com.vivaldi.Vivaldi",
+            "com.vivaldi.Vivaldi.snapshot",
+            "ru.yandex.desktop.yandex-browser",
+            // Opera
+            "com.opera.Opera",
+            "com.operasoftware.Opera",
+            "com.operasoftware.OperaGX",
+            "com.operasoftware.OperaAir",
+            "com.opera.OperaNext",
+            // Firefox-based
+            "org.mozilla.firefox",
+            "org.mozilla.firefoxdeveloperedition",
+            "org.mozilla.nightly",
+            "org.waterfoxproject.waterfox",
+            "io.gitlab.librewolf-community.librewolf",
+            "one.ablaze.floorp",
+            "org.torproject.torbrowser",
+            "net.mullvad.mullvadbrowser",
+            // Safari
+            "com.apple.Safari",
+            "com.apple.SafariTechnologyPreview",
+            // WebKit-based
+            "com.kagi.kagimacOS",
+            // Arc & Others
+            "company.thebrowser.Browser",
+            "company.thebrowser.Arc",
+            "company.thebrowser.dia",
+            "app.zen-browser.zen",
+            "com.sigmaos.sigmaos.macos",
+            "com.pushplaylabs.sidekick",
+            "com.firstversionist.polypane",
+            "ai.perplexity.comet",
+            "com.duckduckgo.macos.browser"
+        ]
+        
         if browsers.contains(bundleId) && role == "AXTextField" {
             debugCallback?("    → Method: selection (browser address bar)")
             cachedMethod = .selection
