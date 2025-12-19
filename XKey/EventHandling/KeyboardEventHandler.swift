@@ -166,11 +166,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let xkeyDir = appSupport.appendingPathComponent("XKey")
         let path = xkeyDir.appendingPathComponent("smart_switch.json").path
-        
-        if smartSwitchManager.loadFromFile(path: path) {
-            let apps = smartSwitchManager.getAllApps()
-            debugLogCallback?("📦 Loaded \(apps.count) app language settings from file")
-        }
+
+        _ = smartSwitchManager.loadFromFile(path: path)
     }
     
     // MARK: - Macro Data Loading
@@ -207,7 +204,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         if !isVietnameseEnabled {
             engine.reset()
         }
-        debugLogCallback?("Vietnamese input: \(isVietnameseEnabled ? "ON" : "OFF"), vLanguage=\(engine.vLanguage)")
     }
     
     func setVietnamese(_ enabled: Bool) {
@@ -222,26 +218,21 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     // MARK: - EventTapDelegate
     
     func shouldProcessEvent(_ event: CGEvent, type: CGEventType) -> Bool {
-        debugLogCallback?("shouldProcessEvent: enabled=\(isVietnameseEnabled), macroInEnglish=\(macroInEnglishMode), macroEnabled=\(macroEnabled), type=\(type.rawValue)")
-
         // Check if current app is in excluded list
         if isCurrentAppExcluded() {
-            debugLogCallback?("  → Current app is EXCLUDED")
             return false
         }
-        
+
         // Check if we should process in English mode (for macro support)
         let shouldProcessInEnglishMode = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
-        
+
         // Only process key down events when Vietnamese is enabled OR macro in English mode is enabled
         guard isVietnameseEnabled || shouldProcessInEnglishMode else {
-            debugLogCallback?("  → Vietnamese DISABLED and macro in English mode OFF")
             return false
         }
 
         // Only process key down events
         guard type == .keyDown else {
-            debugLogCallback?("  → Not keyDown (type=\(type.rawValue))")
             return false
         }
 
@@ -249,15 +240,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         if event.isControlPressed && tempOffSpellingEnabled {
             // Temporarily disable spell checking when Ctrl is pressed
             engine.vTempOffSpelling = 1
-            debugLogCallback?("  → Ctrl pressed - temp off spelling")
         } else {
             engine.vTempOffSpelling = 0
         }
-        
+
         // Handle Option key for temp off engine
         if event.isOptionPressed && tempOffEngineEnabled {
             // Temporarily disable engine when Option is pressed
-            debugLogCallback?("  → Option pressed - temp off engine")
             engine.reset()
             injector.markNewSession()
             return false
@@ -265,7 +254,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Don't process if Command is pressed
         if event.isCommandPressed {
-            debugLogCallback?("  → Has Cmd modifier")
             engine.reset()
             // Cmd + Arrow keys move cursor, so mark as mid-sentence
             // This prevents Forward Delete from deleting text on the right
@@ -275,24 +263,21 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             injector.markNewSession(cursorMoved: isCursorMovement)
             return false
         }
-        
+
         // Don't process if Option is pressed and tempOffEngine is NOT enabled
         if event.isOptionPressed && !tempOffEngineEnabled {
-            debugLogCallback?("  → Option pressed but tempOffEngine disabled")
-            engine.reset()
-            injector.markNewSession()
-            return false
-        }
-        
-        // If only Ctrl is pressed and tempOffSpelling is NOT enabled, skip processing
-        if event.isControlPressed && !tempOffSpellingEnabled {
-            debugLogCallback?("  → Ctrl pressed but tempOffSpelling disabled")
             engine.reset()
             injector.markNewSession()
             return false
         }
 
-        debugLogCallback?("  → OK, will process")
+        // If only Ctrl is pressed and tempOffSpelling is NOT enabled, skip processing
+        if event.isControlPressed && !tempOffSpellingEnabled {
+            engine.reset()
+            injector.markNewSession()
+            return false
+        }
+
         return true
     }
     
@@ -309,8 +294,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Handle Backspace/Delete
         if keyCode == 0x33 {
-            debugLogCallback?("KEY: [BACKSPACE] code=\(keyCode)")
-            debugLogCallback?("  → BACKSPACE")
             return handleBackspace(event: event, proxy: proxy)
         }
 
@@ -325,10 +308,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             0x74, // Page Up
             0x79  // Page Down
         ]
-        
+
         if cursorMovementKeys.contains(keyCode) {
-            debugLogCallback?("KEY: [CURSOR] code=\(keyCode)")
-            debugLogCallback?("  → CURSOR MOVEMENT - reset engine, mark mid-sentence")
             engine.reset()
             injector.markNewSession(cursorMoved: true)  // Mark that cursor was moved
             return event
@@ -336,8 +317,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Handle Tab key - reset engine and mid-sentence flag (new field)
         if keyCode == 0x30 { // Tab
-            debugLogCallback?("KEY: [TAB] code=\(keyCode)")
-            debugLogCallback?("  → TAB - reset engine, new field")
             engine.reset()
             injector.markNewSession(cursorMoved: false)  // New field, not mid-sentence
             return event
@@ -345,18 +324,13 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Handle Escape key - undo typing if enabled
         if keyCode == 0x35 { // Escape
-            debugLogCallback?("KEY: [ESC] code=\(keyCode)")
-
             // Only handle undo if setting is enabled
             if undoTypingEnabled {
                 // Check if undo is available
                 if engine.canUndoTyping() {
-                    debugLogCallback?("  → ESC - can undo, performing undo")
                     let result = engine.undoTyping()
 
                     if result.shouldConsume {
-                        debugLogCallback?("  → ESC - undo successful, bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
-
                         // Use synchronized injection to replace Vietnamese text with raw keystrokes
                         injector.injectSync(
                             backspaceCount: result.backspaceCount,
@@ -369,14 +343,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                         // Mark new session after undo
                         injector.markNewSession()
 
-                        debugLogCallback?("  → ESC - undo completed, consuming event")
                         return nil  // Consume the event
                     }
-                } else {
-                    debugLogCallback?("  → ESC - no undo available")
                 }
-            } else {
-                debugLogCallback?("  → ESC - undo not enabled")
             }
 
             // Pass through if undo not enabled or nothing to undo
@@ -385,7 +354,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Handle Forward Delete (Fn+Delete)
         if keyCode == 0x75 { // Forward Delete
-            debugLogCallback?("KEY: [FWD DELETE] code=\(keyCode)")
             engine.reset()
             injector.markNewSession()
             return event  // Pass through
@@ -415,8 +383,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
         // Use the QWERTY character for processing
         let character = qwertyCharacter
-
-        debugLogCallback?("KEY: '\(character)' code=\(keyCode) (QWERTY)")
 
         // Check if we're in English mode with macro support
         let isEnglishModeWithMacro = !isVietnameseEnabled && macroEnabled && macroInEnglishMode
@@ -465,29 +431,15 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Wait for any pending injection to complete before processing next keystroke
         // Uses semaphore synchronization to prevent race conditions
         injector.waitForInjectionComplete()
-        
+
         // Process through engine (Vietnamese mode)
-        debugLogCallback?("  → Calling engine.processKey('\(character)')...")
         let result = engine.processKey(
             character: character,
             keyCode: keyCode,
             isUppercase: isUppercase
         )
-        debugLogCallback?("  → Engine returned: shouldConsume=\(result.shouldConsume), bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
 
         if result.shouldConsume {
-            debugLogCallback?("  → CONSUME: bs=\(result.backspaceCount) chars=\(result.newCharacters.count)")
-            // Debug log
-            if !result.newCharacters.isEmpty {
-                let chars = result.newCharacters.map { $0.unicode(codeTable: codeTable) }.joined()
-                debugLogCallback?("    → Inject: \(chars)")
-                for (index, char) in result.newCharacters.enumerated() {
-                    let unicode = char.unicode(codeTable: codeTable)
-                    let unicodeHex = unicode.unicodeScalars.map { String(format: "U+%04X", $0.value) }.joined(separator: ", ")
-                    debugLogCallback?("      [\(index)]: '\(unicode)' (\(unicodeHex))")
-                }
-            }
-
             // Use synchronized injection (backspace + text in one atomic operation)
             // This prevents race conditions in terminals where next keystroke arrives
             // between backspace and text injection
@@ -504,7 +456,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         }
 
         // Pass through
-        debugLogCallback?("  → PASS THROUGH")
         return event
     }
     
@@ -517,20 +468,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             engine.updateMacroBufferOnBackspace()
             return event  // Pass through
         }
-        
+
         let result = engine.processBackspace()
 
-        debugLogCallback?("  → Backspace result: shouldConsume=\(result.shouldConsume), bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
-
         if result.shouldConsume {
-            debugLogCallback?("    → Inject: bs=\(result.backspaceCount), chars=\(result.newCharacters.count)")
-            
-            // Log each character being injected
-            for (index, char) in result.newCharacters.enumerated() {
-                let unicode = char.unicode(codeTable: codeTable)
-                debugLogCallback?("      [\(index)]: '\(unicode)' (U+\(String(format: "%04X", unicode.unicodeScalars.first?.value ?? 0)))")
-            }
-            
             // Use synchronized injection
             injector.injectSync(
                 backspaceCount: result.backspaceCount,

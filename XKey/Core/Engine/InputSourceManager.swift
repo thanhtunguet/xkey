@@ -73,10 +73,6 @@ class InputSourceManager {
 
         // Setup observer
         setupObserver()
-
-        debugLogCallback?("📝 InputSourceManager initialized")
-        debugLogCallback?("   Current: \(currentInputSource?.displayName ?? "Unknown")")
-        debugLogCallback?("   Available: \(availableInputSources.count) sources")
     }
 
     deinit {
@@ -94,8 +90,6 @@ class InputSourceManager {
             object: nil,
             suspensionBehavior: .deliverImmediately
         )
-
-        debugLogCallback?("✅ Input source observer registered")
     }
 
     @objc private func inputSourceDidChange(_ notification: Notification) {
@@ -113,15 +107,10 @@ class InputSourceManager {
         let shouldEnable: Bool
         if Self.isXKeyInputSource(newSource) {
             shouldEnable = true
-            debugLogCallback?("🔑 Switched to XKey input source - forcing Vietnamese enabled")
         } else {
             // Check if XKey should be enabled for this input source
             shouldEnable = config.isXKeyEnabled(for: newSource.id)
         }
-
-        debugLogCallback?("🔄 Input source changed: \(newSource.displayName)")
-        debugLogCallback?("   ID: \(newSource.id)")
-        debugLogCallback?("   XKey should be: \(shouldEnable ? "ENABLED" : "DISABLED")")
 
         // Notify delegate
         onInputSourceChanged?(newSource, shouldEnable)
@@ -144,12 +133,9 @@ class InputSourceManager {
         config.setEnabled(enabled, for: inputSourceID)
         saveConfig()
 
-        debugLogCallback?("💾 Updated config: \(inputSourceID) → \(enabled ? "enabled" : "disabled")")
-
         // If this is the current input source, trigger the change immediately
         if currentInputSource?.id == inputSourceID {
             if let source = currentInputSource {
-                debugLogCallback?("🔄 Triggering immediate update for current input source")
                 onInputSourceChanged?(source, enabled)
 
                 // Also post notification for UI
@@ -171,7 +157,6 @@ class InputSourceManager {
     private func saveConfig() {
         if let data = try? JSONEncoder().encode(config) {
             SharedSettings.shared.setInputSourceConfig(data)
-            debugLogCallback?("✅ Config saved")
         }
     }
 

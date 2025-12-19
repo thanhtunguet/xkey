@@ -136,9 +136,6 @@ class XKeyIMController: IMKInputController {
             isUppercase = character.isUppercase
         }
 
-        // DEBUG: Log all key events
-        IMKitDebugger.shared.log("handle() keyCode=\(keyCode) char='\(character)' base='\(baseChar)' caps=\(hasCapsLock) shift=\(hasShift) upper=\(isUppercase) composing='\(composingText)'", category: "EVENT")
-        
         // Handle modifier keys
         if event.modifierFlags.contains(.command) {
             // Cmd+key: commit composition, reset buffer, and pass through
