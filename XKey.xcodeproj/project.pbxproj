@@ -69,7 +69,6 @@
 		LAUNCHATLOGIN001 /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = LAUNCHATLOGIN002 /* LaunchAtLogin.swift */; };
 		MACROVM001 /* MacroManagementViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = MACROVM002 /* MacroManagementViewModel.swift */; };
 		STATUSBARVM001 /* StatusBarViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = STATUSBARVM002 /* StatusBarViewModel.swift */; };
-		UPDATECHECKER001 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = UPDATECHECKER002 /* UpdateChecker.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -123,7 +122,6 @@
 		LAUNCHATLOGIN002 /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 		MACROVM002 /* MacroManagementViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacroManagementViewModel.swift; sourceTree = "<group>"; };
 		STATUSBARVM002 /* StatusBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarViewModel.swift; sourceTree = "<group>"; };
-		UPDATECHECKER002 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -158,7 +156,6 @@
 				100D2BE32EF2C71E00C26B87 /* IMKitHelper.swift */,
 				LAUNCHATLOGIN002 /* LaunchAtLogin.swift */,
 				APPVERSION002 /* AppVersion.swift */,
-				UPDATECHECKER002 /* UpdateChecker.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -457,7 +454,6 @@
 				CONVERTVM001 /* ConvertToolViewModel.swift in Sources */,
 				EXCLUDEDAPPS001 /* ExcludedAppsView.swift in Sources */,
 				100D2BE62EF2C72600C26B87 /* SharedSettings.swift in Sources */,
-				UPDATECHECKER001 /* UpdateChecker.swift in Sources */,
 				F97414DA17E4F78264530EF0 /* KeyCodeToCharacter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -62,6 +62,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugWindowController?.logEvent(message)
     }
 
+    /// Get the Sparkle updater for external access
+    func getSparkleUpdater() -> SPUUpdater? {
+        return updaterController?.updater
+    }
+
     // MARK: - Application Lifecycle
     
     func applicationDidFinishLaunching(_ notification: Notification) {

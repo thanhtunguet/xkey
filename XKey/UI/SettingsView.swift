@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import Sparkle
 
 // MARK: - Settings Section
 
@@ -430,8 +431,15 @@ struct AppearanceSettingsSection: View {
 
 struct AboutSettingsSection: View {
     @State private var showDonationDialog = false
-    @StateObject private var updateChecker = UpdateChecker()
-    
+
+    // Access to Sparkle updater from AppDelegate
+    private var updater: SPUUpdater? {
+        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            return appDelegate.getSparkleUpdater()
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -489,83 +497,23 @@ struct AboutSettingsSection: View {
                 
                 Divider()
                     .padding(.horizontal, 80)
-                
-                // Update Check Section - Compact
+
+                // Update Check Section - Using Sparkle
                 VStack(spacing: 10) {
-                    switch updateChecker.updateStatus {
-                    case .checking:
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                            Text("Đang kiểm tra cập nhật...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                    case .upToDate:
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(.green)
-                            Text("Đang dùng phiên bản mới nhất")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                    case .updateAvailable(let version, let url, let releaseNotes):
-                        VStack(spacing: 8) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(.blue)
-                                Text("Có phiên bản mới: \(version)")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                            }
-                            
-                            if !releaseNotes.isEmpty {
-                                ScrollView {
-                                    Text(releaseNotes)
-                                        .font(.caption2)
-                                        .foregroundColor(.secondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(8)
-                                        .background(Color.secondary.opacity(0.1))
-                                        .cornerRadius(6)
-                                }
-                                .frame(maxHeight: 80)
-                                .padding(.horizontal, 20)
-                            }
-                            
-                            Button("Tải về") {
-                                if let downloadURL = URL(string: url) {
-                                    NSWorkspace.shared.open(downloadURL)
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.small)
-                        }
-                        
-                    case .error(let message):
-                        HStack(spacing: 8) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(.orange)
-                            Text(message)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .lineLimit(2)
-                        }
-                        .padding(.horizontal, 20)
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(.blue)
+                        Text("Kiểm tra phiên bản mới")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    
+
                     Button("Kiểm tra cập nhật") {
-                        Task {
-                            await updateChecker.checkForUpdates()
-                        }
+                        // Use Sparkle's check for updates (same as menu bar)
+                        updater?.checkForUpdates()
                     }
                     .controlSize(.small)
-                    .disabled(updateChecker.updateStatus == .checking)
                 }
                 .padding(.vertical, 10)
                 .padding(.horizontal, 16)

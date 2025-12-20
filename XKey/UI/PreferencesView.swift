@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Sparkle
 
 struct PreferencesView: View {
     @StateObject private var viewModel = PreferencesViewModel()
@@ -103,8 +104,14 @@ struct PreferencesView: View {
 // MARK: - Tab 0: About
 
 struct AboutTab: View {
-    @StateObject private var updateChecker = UpdateChecker()
-    
+    // Access to Sparkle updater from AppDelegate
+    private var updater: SPUUpdater? {
+        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            return appDelegate.getSparkleUpdater()
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .center, spacing: 20) {
@@ -158,76 +165,23 @@ struct AboutTab: View {
                 Divider()
                     .padding(.horizontal, 40)
                     .padding(.top, 8)
-                
-                // Update Check Section
+
+                // Update Check Section - Using Sparkle
                 GroupBox {
                     VStack(spacing: 12) {
-                        switch updateChecker.updateStatus {
-                        case .checking:
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                Text("Đang kiểm tra cập nhật...")
-                                    .font(.subheadline)
-                            }
-                            
-                        case .upToDate:
-                            VStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.green)
-                                Text("Bạn đang sử dụng phiên bản mới nhất")
-                                    .font(.subheadline)
-                            }
-                            
-                        case .updateAvailable(let version, let url, let releaseNotes):
-                            VStack(spacing: 12) {
-                                Image(systemName: "arrow.down.circle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.blue)
-                                
-                                Text("Có phiên bản mới: \(version)")
-                                    .font(.headline)
-                                
-                                if !releaseNotes.isEmpty {
-                                    ScrollView {
-                                        Text(releaseNotes)
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(8)
-                                            .background(Color.secondary.opacity(0.1))
-                                            .cornerRadius(6)
-                                    }
-                                    .frame(maxHeight: 100)
-                                }
-                                
-                                Button("Tải về") {
-                                    if let downloadURL = URL(string: url) {
-                                        NSWorkspace.shared.open(downloadURL)
-                                    }
-                                }
-                                .buttonStyle(.borderedProminent)
-                            }
-                            
-                        case .error(let message):
-                            VStack(spacing: 8) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.system(size: 32))
-                                    .foregroundColor(.orange)
-                                Text(message)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                        
+                        Image(systemName: "arrow.down.circle")
+                            .font(.system(size: 32))
+                            .foregroundColor(.blue)
+
+                        Text("Kiểm tra phiên bản mới")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
                         Button("Kiểm tra cập nhật") {
-                            Task {
-                                await updateChecker.checkForUpdates()
-                            }
+                            // Use Sparkle's check for updates (same as menu bar)
+                            updater?.checkForUpdates()
                         }
-                        .disabled(updateChecker.updateStatus == .checking)
+                        .buttonStyle(.borderedProminent)
                     }
                     .padding(.vertical, 8)
                 }

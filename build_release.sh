@@ -35,7 +35,7 @@ APP_NAME="XKey"
 DMG_NAME="XKey.dmg"
 DMG_VOLUME_NAME="XKey"
 REPO_URL="https://github.com/xmannv/xkey"
-APPCAST_FILE="appcast.xml"
+APPCAST_FILE="appcast.json"
 SPARKLE_BIN="/tmp/Sparkle-2.8.1/bin"
 
 
@@ -576,97 +576,163 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Releas
 fi
 
 # ============================================
-# Appcast Generation
+# Appcast Generation (JSON format)
 # ============================================
 if [ "$ENABLE_APPCAST" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Release/$DMG_NAME" ]; then
     echo ""
-    echo "📝 Generating appcast.xml..."
-    
+    echo "📝 Generating appcast.json..."
+
     # Get version from Info.plist
     CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-    
+
     # Get DMG file size
     DMG_SIZE=$(stat -f%z "Release/$DMG_NAME")
-    
-    # Get current date in RFC 2822 format
-    PUBDATE=$(date -u +"%a, %d %b %Y %H:%M:%S %z")
-    
+
+    # Get current date in ISO 8601 format for JSON
+    PUBDATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
     # Get minimum system version
     MIN_SYSTEM_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" LSMinimumSystemVersion 2>/dev/null || echo "12.0")
-    
+
     # Download URL
     DOWNLOAD_URL="$REPO_URL/releases/download/v$CURRENT_VERSION/XKey.dmg"
-    
-    # Release notes (can be customized via environment variable)
-    RELEASE_NOTES="${RELEASE_NOTES:-New version available with bug fixes and improvements}"
-    
+
+    # Generate release notes from git commits
+    echo "   Generating release notes from git commits..."
+
+    # Check if manual RELEASE_NOTES is provided
+    if [ -n "$RELEASE_NOTES" ]; then
+        echo "   ✅ Using manual release notes from RELEASE_NOTES variable"
+        RELEASE_NOTES_TEXT="$RELEASE_NOTES"
+    else
+        # Find the previous version tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+        if [ -n "$PREV_TAG" ]; then
+            echo "   📝 Collecting commits since $PREV_TAG..."
+
+            # Get commit messages since previous tag
+            # Format: subject line only, exclude merge commits
+            GIT_LOG=$(git log "$PREV_TAG"..HEAD --no-merges --pretty=format:"- %s" 2>/dev/null || echo "")
+
+            if [ -n "$GIT_LOG" ]; then
+                RELEASE_NOTES_TEXT="$GIT_LOG"
+                echo "   ✅ Found $(echo "$GIT_LOG" | wc -l | tr -d ' ') commits"
+            else
+                echo "   ⚠️  No commits found, using latest commit"
+                RELEASE_NOTES_TEXT="- $(git log -1 --pretty=format:'%s')"
+            fi
+        else
+            echo "   ⚠️  No previous tag found, using latest commit"
+            RELEASE_NOTES_TEXT="- $(git log -1 --pretty=format:'%s')"
+        fi
+    fi
+
+    # Convert to HTML (pure bash/sed - no python dependency)
+    RELEASE_NOTES_HTML=""
+    IN_LIST=false
+
+    while IFS= read -r line; do
+        # Skip empty lines
+        if [ -z "$line" ]; then
+            if [ "$IN_LIST" = true ]; then
+                RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}</ul>"
+                IN_LIST=false
+            fi
+            continue
+        fi
+
+        # Check if line starts with "- " or "* "
+        if echo "$line" | grep -qE '^[*-] '; then
+            # Start list if not already in one
+            if [ "$IN_LIST" = false ]; then
+                RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}<ul>"
+                IN_LIST=true
+            fi
+
+            # Extract item text (remove "- " or "* ")
+            ITEM=$(echo "$line" | sed -E 's/^[*-] //')
+
+            # Convert markdown bold: **text** -> <strong>text</strong>
+            ITEM=$(echo "$ITEM" | sed -E 's/\*\*([^*]+)\*\*/<strong>\1<\/strong>/g')
+
+            # Convert markdown italic: *text* -> <em>text</em> (but not ** which is bold)
+            ITEM=$(echo "$ITEM" | sed -E 's/([^*])\*([^*]+)\*([^*])/\1<em>\2<\/em>\3/g')
+
+            RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}<li>${ITEM}</li>"
+        else
+            # Regular paragraph
+            if [ "$IN_LIST" = true ]; then
+                RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}</ul>"
+                IN_LIST=false
+            fi
+            RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}<p>${line}</p>"
+        fi
+    done <<< "$RELEASE_NOTES_TEXT"
+
+    # Close list if still open
+    if [ "$IN_LIST" = true ]; then
+        RELEASE_NOTES_HTML="${RELEASE_NOTES_HTML}</ul>"
+    fi
+
+    # Fallback if conversion failed
+    if [ -z "$RELEASE_NOTES_HTML" ]; then
+        RELEASE_NOTES_HTML="<p>$RELEASE_NOTES_TEXT</p>"
+    fi
+
+    # Build complete HTML with installation instructions
+    RELEASE_NOTES_HTML="<h2>Phiên bản $CURRENT_VERSION</h2>$RELEASE_NOTES_HTML<h3>Cài đặt</h3><ol><li>Tải về và mở file XKey.dmg</li><li>Kéo XKey vào thư mục Applications</li><li>Khởi động XKey từ Applications</li></ol><p><a href='$REPO_URL/releases/tag/v$CURRENT_VERSION'>Xem chi tiết trên GitHub</a></p>"
+
     echo "   Version: $CURRENT_VERSION"
     echo "   DMG Size: $DMG_SIZE bytes"
     echo "   Date: $PUBDATE"
     echo "   Min macOS: $MIN_SYSTEM_VERSION"
     echo "   Download URL: $DOWNLOAD_URL"
-    
-    # Generate enclosure tag with or without signature
+
+    # Build enclosure JSON with or without signature
     if [ -n "$SPARKLE_SIGNATURE" ]; then
-        ENCLOSURE_TAG="            <enclosure
-                url=\"$DOWNLOAD_URL\"
-                sparkle:version=\"$CURRENT_VERSION\"
-                sparkle:shortVersionString=\"$CURRENT_VERSION\"
-                sparkle:edSignature=\"$SPARKLE_SIGNATURE\"
-                length=\"$DMG_SIZE\"
-                type=\"application/octet-stream\" />"
-    else
-        ENCLOSURE_TAG="            <enclosure
-                url=\"$DOWNLOAD_URL\"
-                sparkle:version=\"$CURRENT_VERSION\"
-                sparkle:shortVersionString=\"$CURRENT_VERSION\"
-                length=\"$DMG_SIZE\"
-                type=\"application/octet-stream\" />"
-    fi
-    
-    # Create new appcast.xml
-    cat > "$APPCAST_FILE" << EOF
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <channel>
-        <title>XKey Updates</title>
-        <link>https://raw.githubusercontent.com/xmannv/xkey/main/appcast.xml</link>
-        <description>XKey - Vietnamese Input Method for macOS</description>
-        <language>vi</language>
-
-        <!-- Latest Release -->
-        <item>
-            <title>Version $CURRENT_VERSION</title>
-            <link>$REPO_URL/releases/tag/v$CURRENT_VERSION</link>
-            <sparkle:version>$CURRENT_VERSION</sparkle:version>
-            <sparkle:shortVersionString>$CURRENT_VERSION</sparkle:shortVersionString>
-            <description><![CDATA[
-                <h2>Phiên bản $CURRENT_VERSION</h2>
-                <p>$RELEASE_NOTES</p>
-
-                <h3>Cài đặt</h3>
-                <ol>
-                    <li>Tải về và mở file XKey.dmg</li>
-                    <li>Kéo XKey vào thư mục Applications</li>
-                    <li>Khởi động XKey từ Applications</li>
-                </ol>
-
-                <p><a href="$REPO_URL/releases/tag/v$CURRENT_VERSION">Xem chi tiết trên GitHub</a></p>
-            ]]></description>
-            <pubDate>$PUBDATE</pubDate>
-            <sparkle:minimumSystemVersion>$MIN_SYSTEM_VERSION</sparkle:minimumSystemVersion>
-$ENCLOSURE_TAG
-        </item>
-
-        <!-- Previous releases -->
-        <!-- Add older versions below this line -->
-
-    </channel>
-</rss>
+        ENCLOSURE_JSON=$(cat <<EOF
+      "url": "$DOWNLOAD_URL",
+      "version": "$CURRENT_VERSION",
+      "edSignature": "$SPARKLE_SIGNATURE",
+      "length": $DMG_SIZE,
+      "type": "application/octet-stream"
 EOF
-    
-    echo "✅ appcast.xml generated successfully!"
-    
+)
+    else
+        ENCLOSURE_JSON=$(cat <<EOF
+      "url": "$DOWNLOAD_URL",
+      "version": "$CURRENT_VERSION",
+      "length": $DMG_SIZE,
+      "type": "application/octet-stream"
+EOF
+)
+    fi
+
+    # Create appcast.json
+    cat > "$APPCAST_FILE" << EOF
+{
+  "title": "XKey Updates",
+  "description": "XKey - Vietnamese Input Method for macOS",
+  "language": "vi",
+  "items": [
+    {
+      "title": "Version $CURRENT_VERSION",
+      "version": "$CURRENT_VERSION",
+      "url": "$REPO_URL/releases/tag/v$CURRENT_VERSION",
+      "releaseNotesHTML": "$RELEASE_NOTES_HTML",
+      "pubDate": "$PUBDATE",
+      "minimumSystemVersion": "$MIN_SYSTEM_VERSION",
+      "enclosure": {
+$ENCLOSURE_JSON
+      }
+    }
+  ]
+}
+EOF
+
+    echo "✅ appcast.json generated successfully!"
+
     if [ -n "$SPARKLE_SIGNATURE" ]; then
         echo "   ✅ Includes EdDSA signature for secure updates"
     else
@@ -760,7 +826,7 @@ echo ""
 echo "📋 Next steps for release:"
 if [ "$ENABLE_APPCAST" = true ] && [ -f "$APPCAST_FILE" ]; then
     CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-    echo "   1. Review appcast.xml: cat $APPCAST_FILE"
+    echo "   1. Review appcast.json: cat $APPCAST_FILE"
     echo "   2. Commit changes: git add $APPCAST_FILE && git commit -m \"Update appcast for v$CURRENT_VERSION\""
     echo "   3. Push to GitHub: git push origin main"
     echo "   4. Create release: gh release create v$CURRENT_VERSION Release/XKey.dmg --title \"XKey v$CURRENT_VERSION\" --notes \"\$RELEASE_NOTES\""
