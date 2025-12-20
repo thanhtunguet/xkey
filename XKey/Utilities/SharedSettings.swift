@@ -124,7 +124,7 @@ class SharedSettings {
             let hasBackup = localDefaults.object(forKey: SharedSettingsKey.inputMethod.rawValue) != nil
 
             if hasBackup {
-                print("📦 SharedSettings: Restoring from backup...")
+                logInfo("Restoring from backup...", source: "SharedSettings")
 
                 // Restore all settings from standard defaults to App Group
                 for key in getAllSettingsKeys() {
@@ -134,7 +134,7 @@ class SharedSettings {
                 }
 
                 shared.synchronize()
-                print("✅ SharedSettings: Restored from backup successfully")
+                logSuccess("Restored from backup successfully", source: "SharedSettings")
             }
         }
     }
@@ -469,7 +469,7 @@ class SharedSettings {
     private func writeDirectlyToPlist(key: String, value: Any) {
         // Get the plist file path in App Group container
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: kXKeyAppGroup) else {
-            print("⚠️ SharedSettings: Cannot get App Group container URL")
+            logWarning("Cannot get App Group container URL", source: "SharedSettings")
             return
         }
         
@@ -489,9 +489,9 @@ class SharedSettings {
         do {
             let data = try PropertyListSerialization.data(fromPropertyList: plistDict, format: .binary, options: 0)
             try data.write(to: prefsURL)
-            print("✅ SharedSettings: Wrote \(key)=\(value) directly to plist")
+            logSuccess("Wrote \(key)=\(value) directly to plist", source: "SharedSettings")
         } catch {
-            print("❌ SharedSettings: Failed to write plist: \(error)")
+            logError("Failed to write plist: \(error)", source: "SharedSettings")
         }
     }
 

@@ -35,7 +35,7 @@ class PreferencesViewModel: ObservableObject {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                print("Failed to \(enabled ? "enable" : "disable") launch at login: \(error)")
+                
             }
         } else {
             SMLoginItemSetEnabled("group.com.codetay.inputmethod.XKey.debug" as CFString, enabled)

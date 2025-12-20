@@ -10,16 +10,16 @@ import SwiftUI
 struct PreferencesView: View {
     @StateObject private var viewModel = PreferencesViewModel()
     @State private var selectedTab: Int
-    
+
     var onSave: ((Preferences) -> Void)?
     var onClose: (() -> Void)?
-    
+
     init(selectedTab: Int = 0, onSave: ((Preferences) -> Void)? = nil, onClose: (() -> Void)? = nil) {
         self._selectedTab = State(initialValue: selectedTab)
         self.onSave = onSave
         self.onClose = onClose
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Title
@@ -406,7 +406,7 @@ struct AdvancedTab: View {
                                 .padding(.leading, 16)
                             
                             Button("Quản lý Macro...") {
-                                print("Open macro management")
+                                
                             }
                             .padding(.leading, 16)
                             .padding(.top, 4)

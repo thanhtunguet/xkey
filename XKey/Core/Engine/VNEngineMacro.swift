@@ -9,19 +9,19 @@
 import Foundation
 
 extension VNEngine {
-    
+
     // MARK: - Macro Manager
-    
+
     /// Shared macro manager instance
     private static var _macroManager: MacroManager?
-    
+
     var macroManager: MacroManager {
         if VNEngine._macroManager == nil {
             VNEngine._macroManager = MacroManager()
         }
         return VNEngine._macroManager!
     }
-    
+
     /// Set shared macro manager (for integration with KeyboardEventHandler)
     static func setSharedMacroManager(_ manager: MacroManager) {
         _macroManager = manager
@@ -68,13 +68,13 @@ extension VNEngine {
         if vUseMacro != 1 {
             return false
         }
-        
+
         // Check if in English mode
         if vLanguage == 0 {
             // English mode - check if macro in English mode is enabled
             return vUseMacroInEnglishMode == 1
         }
-        
+
         // Vietnamese mode - always use macro if enabled
         return true
     }

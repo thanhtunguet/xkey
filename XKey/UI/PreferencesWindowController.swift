@@ -9,7 +9,7 @@ import Cocoa
 import SwiftUI
 
 class PreferencesWindowController: NSWindowController {
-    
+
     convenience init(selectedTab: Int = 0, onSave: @escaping (Preferences) -> Void) {
         // Create window first
         let window = NSWindow(
@@ -22,14 +22,14 @@ class PreferencesWindowController: NSWindowController {
         window.isReleasedWhenClosed = false
         window.level = .floating  // Always on top
         window.center()
-        
+
         // Hide traffic light buttons
         window.standardWindowButton(.closeButton)?.isHidden = true
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true
         window.standardWindowButton(.zoomButton)?.isHidden = true
-        
+
         self.init(window: window)
-        
+
         // Create SwiftUI view with close callback
         let preferencesView = PreferencesView(
             selectedTab: selectedTab,
@@ -38,7 +38,7 @@ class PreferencesWindowController: NSWindowController {
                 self?.close()
             }
         )
-        
+
         // Wrap in hosting controller
         let hostingController = NSHostingController(rootView: preferencesView)
         window.contentViewController = hostingController

@@ -1506,18 +1506,18 @@ class VNEngine {
         }
         return UInt16(typingWord[idx] & VNEngine.CHAR_MASK)
     }
-    
+
     // MARK: - Grammar Check
-    
+
     /// Check and auto-fix vowel combinations like "ưo" → "ươ"
     /// This should always run regardless of vFreeMark setting
     private func checkVowelAutoFix(deltaBackSpace: Int) {
         logCallback?("checkVowelAutoFix: index=\(index), deltaBackSpace=\(deltaBackSpace)")
-        
+
         if index <= 1 || index >= VNEngine.MAX_BUFF {
             return
         }
-        
+
         // Debug: print typingWord contents
         var debugBuffer = "typingWord: "
         for i in 0..<Int(index) {

@@ -16,7 +16,7 @@ class InputSourceSwitcher {
     static let xkeyIMBundleId = "com.codetay.inputmethod.XKey"
 
     /// ABC (US English) input source bundle identifier
-    static let abcBundleId = "com.apple.keylayout.ABC"
+    static let abcBundleId = "com.apple.keyboardlayout.all"
 
     // MARK: - Switch Input Source
 

@@ -10,7 +10,7 @@ import SwiftUI
 
 @available(macOS 13.0, *)
 class SettingsWindowController: NSWindowController {
-    
+
     convenience init(selectedSection: SettingsSection = .general, onSave: @escaping (Preferences) -> Void) {
         // Create window with modern style
         let window = NSWindow(
@@ -19,22 +19,22 @@ class SettingsWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        
+
         window.title = "Cài đặt XKey"
         window.titlebarAppearsTransparent = false
         window.isReleasedWhenClosed = false
         window.level = .floating
         window.center()
-        
+
         self.init(window: window)
-        
+
         // Create SwiftUI view with auto-save callback
         let settingsView = SettingsView(
             selectedSection: selectedSection,
             onSave: onSave,
             onClose: nil
         )
-        
+
         // Wrap in hosting controller
         let hostingController = NSHostingController(rootView: settingsView)
         window.contentViewController = hostingController

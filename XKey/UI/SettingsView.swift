@@ -44,16 +44,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     @StateObject private var viewModel = PreferencesViewModel()
     @State private var selectedSection: SettingsSection
-    
+
     var onSave: ((Preferences) -> Void)?
     var onClose: (() -> Void)?
-    
+
     init(selectedSection: SettingsSection = .general, onSave: ((Preferences) -> Void)? = nil, onClose: (() -> Void)? = nil) {
         self._selectedSection = State(initialValue: selectedSection)
         self.onSave = onSave
         self.onClose = onClose
     }
-    
+
     var body: some View {
         NavigationSplitView {
             // Sidebar
@@ -353,7 +353,7 @@ struct AdvancedSettingsSection: View {
                                         .frame(width: 150)
                                 }
                                 
-                                Text("Phím tắt này sẽ toggle giữa XKey và ABC (nếu đang dùng XKey → ABC, ngược lại → XKey)")
+                                Text("Phím tắt này sẽ toggle giữa XKey và ABC. Nếu đang dùng XKey → chuyển sang ABC (hoặc bộ gõ tiếng Anh khác), ngược lại → XKey")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                                 
@@ -599,7 +599,7 @@ struct MacroSettingsSection: View {
     @State private var newMacroContent: String = ""
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -1166,7 +1166,7 @@ class InputSourcesViewModel: ObservableObject {
     init() {
         manager = InputSourceManager()
         manager?.debugLogCallback = { message in
-            print(message)
+            logInfo(message, source: "InputSourceManager")
         }
 
         // Listen for input source changes

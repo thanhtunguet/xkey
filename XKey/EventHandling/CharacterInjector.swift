@@ -83,8 +83,11 @@ class CharacterInjector {
         defer { injectionSemaphore.signal() }
         
         let (method, delays) = detectInjectionMethod()
-        debugCallback?("injectSync: bs=\(backspaceCount), chars=\(characters.count), method=\(method)")
-        
+
+        // Build preview of characters to inject
+        let charPreview = characters.map { $0.unicode(codeTable: codeTable) }.joined()
+        debugCallback?("Inject: bs=\(backspaceCount), chars=\(characters.count), text=\"\(charPreview)\", method=\(method)")
+
         // IMPORTANT: Disable autocomplete fix when typing in middle of sentence
         let shouldFixAutocomplete = fixAutocomplete && !isTypingMidSentence
         

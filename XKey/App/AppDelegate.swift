@@ -40,7 +40,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     // MARK: - Public Accessors
-    
+
+    /// Get the keyboard handler for external access
+    func getKeyboardHandler() -> KeyboardEventHandler? {
+        return keyboardHandler
+    }
+
     /// Get the macro manager for external access
     func getMacroManager() -> MacroManager? {
         if keyboardHandler == nil {
@@ -49,7 +54,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         return keyboardHandler?.getMacroManager()
     }
-    
+
     /// Log message to debug window (for external access)
     func logToDebugWindow(_ message: String) {
         debugWindowController?.logEvent(message)
@@ -155,13 +160,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check if debug mode is enabled in preferences
         let preferences = SharedSettings.shared.loadPreferences()
         let shouldShowDebug = preferences.debugModeEnabled
-        
+
         // Show debug window only if enabled in settings
         if shouldShowDebug {
             debugWindowController = DebugWindowController()
             debugWindowController?.showWindow(nil)
             debugWindowController?.logEvent("✅ Debug window created (enabled in settings)")
-            
+
+            // Connect DebugLogger to debug window
+            DebugLogger.shared.debugWindowController = debugWindowController
+
             // Setup read word callback
             debugWindowController?.setupReadWordCallback { [weak self] in
                 self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
@@ -711,10 +719,67 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Reset engine when mouse is clicked (likely focus change or cursor move)
             // Mark as cursor moved to disable autocomplete fix (avoid deleting text on right)
             self?.keyboardHandler?.resetWithCursorMoved()
-            self?.debugWindowController?.logEvent("🖱️ Mouse click - engine reset, mid-sentence mode")
+
+            // Log detailed input detection info
+            self?.logMouseClickInputDetection()
         }
 
         debugWindowController?.logEvent("  ✅ Mouse click monitor registered")
+    }
+
+    /// Log detailed information about the input type when mouse is clicked
+    private func logMouseClickInputDetection() {
+        // Get frontmost app info
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              let bundleId = app.bundleIdentifier else {
+            debugWindowController?.logEvent("🖱️ Mouse click - engine reset, mid-sentence mode")
+            return
+        }
+
+        let appName = app.localizedName ?? "Unknown"
+
+        // Get focused element role from Accessibility API
+        let detector = AppBehaviorDetector.shared
+        let elementRole = detector.getFocusedElementRole() ?? "Unknown"
+
+        // Get app behavior type
+        let behavior = detector.detect()
+        let behaviorName: String
+        switch behavior {
+        case .standard:
+            behaviorName = "Standard"
+        case .terminal:
+            behaviorName = "Terminal"
+        case .browserAddressBar:
+            behaviorName = "Browser Address Bar"
+        case .jetbrainsIDE:
+            behaviorName = "JetBrains IDE"
+        case .microsoftOffice:
+            behaviorName = "Microsoft Office"
+        case .spotlight:
+            behaviorName = "Spotlight"
+        case .electronApp:
+            behaviorName = "Electron App"
+        case .codeEditor:
+            behaviorName = "Code Editor"
+        }
+
+        // Get injection method info
+        let injectionInfo = detector.detectInjectionMethod()
+        let injectionMethod = injectionInfo.description
+
+        // Get current input source
+        let inputSource = InputSourceManager.getCurrentInputSource()
+        let inputSourceName = inputSource?.displayName ?? "Unknown"
+
+        // Log everything with nice formatting
+        debugWindowController?.logEvent("🖱️ Mouse click detected")
+        debugWindowController?.logEvent("   App: \(appName) (\(bundleId))")
+        debugWindowController?.logEvent("   Input Type: \(elementRole)")
+        debugWindowController?.logEvent("   Behavior: \(behaviorName)")
+        debugWindowController?.logEvent("   Injection Method: \(injectionMethod)")
+        debugWindowController?.logEvent("   Input Source: \(inputSourceName)")
+        debugWindowController?.logEvent("   → Engine reset, mid-sentence mode")
     }
 
     private func setupInputSourceManager() {

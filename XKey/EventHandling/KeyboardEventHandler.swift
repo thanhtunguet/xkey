@@ -100,7 +100,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
 
     // Undo typing with Esc key
     @Published var undoTypingEnabled: Bool = false
-    
+
     // Managers
     private let macroManager = MacroManager()
     private let smartSwitchManager = SmartSwitchManager()
@@ -124,7 +124,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         // Share managers with VNEngine
         VNEngine.setSharedMacroManager(macroManager)
         VNEngine.setSharedSmartSwitchManager(smartSwitchManager)
-        
+
         // Macro manager logging disabled for cleaner output
         // macroManager.logCallback = { [weak self] message in
         //     self?.debugLogCallback?("📦 Macro: \(message)")
@@ -541,11 +541,11 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     // MARK: - Macro Management
-    
+
     func getMacroManager() -> MacroManager {
         return macroManager
     }
-    
+
     func getSmartSwitchManager() -> SmartSwitchManager {
         return smartSwitchManager
     }

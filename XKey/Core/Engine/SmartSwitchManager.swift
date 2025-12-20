@@ -65,7 +65,6 @@ class SmartSwitchManager {
             try data.write(to: URL(fileURLWithPath: path))
             return true
         } catch {
-            print("Error saving smart switch data: \(error)")
             return false
         }
     }
@@ -77,7 +76,6 @@ class SmartSwitchManager {
             appLanguageMap = try JSONDecoder().decode([String: Int].self, from: data)
             return true
         } catch {
-            print("Error loading smart switch data: \(error)")
             return false
         }
     }

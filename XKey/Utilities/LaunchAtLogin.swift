@@ -21,7 +21,7 @@ class LaunchAtLogin {
                     try SMAppService.mainApp.unregister()
                 }
             } catch {
-                print("Failed to \(enabled ? "enable" : "disable") launch at login: \(error)")
+                
             }
         } else {
             // Legacy API for macOS 12 and below

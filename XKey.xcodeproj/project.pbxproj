@@ -27,6 +27,7 @@
 		10133E5C2EF04B0C00BBE6AE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 10133E5B2EF04B0C00BBE6AE /* Assets.xcassets */; };
 		101A44482ED419AE003F9D05 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101A44472ED419AE003F9D05 /* Preferences.swift */; };
 		1029C48F2EF0504D0073ABCD /* DonationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1029C48E2EF0504D0073ABCD /* DonationView.swift */; };
+		1049D2E22EF64F6500FDC8AC /* DebugLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1049D2E12EF64F6500FDC8AC /* DebugLogger.swift */; };
 		106779A62ED41FD400FE0B24 /* StatusBarManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106779A22ED41FD400FE0B24 /* StatusBarManager.swift */; };
 		106779A72ED41FD400FE0B24 /* DebugWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 106779A12ED41FD400FE0B24 /* DebugWindowController.swift */; };
 		107602EE2EF4E3BA00ADC084 /* InputSourceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 107602EC2EF4E3BA00ADC084 /* InputSourceManager.swift */; };
@@ -78,6 +79,7 @@
 		10133E5B2EF04B0C00BBE6AE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		101A44472ED419AE003F9D05 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		1029C48E2EF0504D0073ABCD /* DonationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DonationView.swift; sourceTree = "<group>"; };
+		1049D2E12EF64F6500FDC8AC /* DebugLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogger.swift; sourceTree = "<group>"; };
 		106779A12ED41FD400FE0B24 /* DebugWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugWindowController.swift; sourceTree = "<group>"; };
 		106779A22ED41FD400FE0B24 /* StatusBarManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarManager.swift; sourceTree = "<group>"; };
 		107602EC2EF4E3BA00ADC084 /* InputSourceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceManager.swift; sourceTree = "<group>"; };
@@ -148,6 +150,7 @@
 		101A444A2ED419E9003F9D05 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				1049D2E12EF64F6500FDC8AC /* DebugLogger.swift */,
 				10FDCC1B2EF5942400B2D9AC /* InputSourceSwitcher.swift */,
 				100D2BE52EF2C72600C26B87 /* SharedSettings.swift */,
 				100D2BE32EF2C71E00C26B87 /* IMKitHelper.swift */,
@@ -434,6 +437,7 @@
 				101A44482ED419AE003F9D05 /* Preferences.swift in Sources */,
 				48B758BE0BDCAB95CFBADD3D /* VNEngineSettings.swift in Sources */,
 				564995EF131811377C4F3FF6 /* VNEngineAdvanced.swift in Sources */,
+				1049D2E22EF64F6500FDC8AC /* DebugLogger.swift in Sources */,
 				7FBD214005ADB766CB3DF3B8 /* VNEngineMacro.swift in Sources */,
 				E93062521966136C34EDEC22 /* VNEngineSmartSwitch.swift in Sources */,
 				5A61FAA58A29AD3225DD649C /* SettingsView.swift in Sources */,

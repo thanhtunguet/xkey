@@ -177,7 +177,7 @@ class MacroManager {
             try content.write(toFile: path, atomically: true, encoding: .utf8)
             return true
         } catch {
-            print("Error saving macros: \(error)")
+            logCallback?("Error saving macros: \(error)")
             return false
         }
     }
