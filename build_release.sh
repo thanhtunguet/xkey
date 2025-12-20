@@ -566,6 +566,11 @@ if [ "$ENABLE_SPARKLE_SIGN" = true ] && [ "$ENABLE_DMG" = true ] && [ -f "Releas
     echo "✅ DMG signed with Sparkle EdDSA signature"
     echo "   Signature: ${SPARKLE_SIGNATURE:0:50}..."
     
+    # Save signature to file for GitHub release upload
+    echo "$SPARKLE_SIGNATURE" > "Release/signature.txt"
+    echo "✅ Signature saved to: Release/signature.txt"
+    echo "   ⚠️  IMPORTANT: Upload this file to GitHub Release along with XKey.dmg"
+    
     # Export signature for reference
     export SPARKLE_SIGNATURE
 fi
@@ -649,14 +654,17 @@ echo "   (Or it will be retrieved from Keychain automatically)"
 echo ""
 echo "📋 Next steps for release:"
 CURRENT_VERSION=$(defaults read "$(pwd)/XKey/Info.plist" CFBundleShortVersionString)
-echo "   1. Create GitHub Release:"
-echo "      gh release create v$CURRENT_VERSION Release/XKey.dmg \\"
+echo "   1. Create GitHub Release (include signature.txt for auto-update):"
+echo "      gh release create v$CURRENT_VERSION Release/XKey.dmg Release/signature.txt \\"
 echo "         --title \"XKey v$CURRENT_VERSION\" \\"
 echo "         --notes \"Your release notes here\""
 echo ""
 echo "   2. GitHub Actions will automatically:"
-echo "      - Update feed for Sparkle auto-updates"
+echo "      - Generate appcast.xml with EdDSA signature"
+echo "      - Deploy to GitHub Pages for Sparkle auto-updates"
 echo "      - Users will receive update notification"
+echo ""
+echo "   ⚠️  IMPORTANT: signature.txt MUST be uploaded for updates to work!"
 echo ""
 echo "   📖 See .github/QUICK_SETUP.md for GitHub Pages setup"
 

@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import Sparkle
 
 // MARK: - Settings Section
 
@@ -432,14 +431,6 @@ struct AppearanceSettingsSection: View {
 struct AboutSettingsSection: View {
     @State private var showDonationDialog = false
 
-    // Access to Sparkle updater from AppDelegate
-    private var updater: SPUUpdater? {
-        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-            return appDelegate.getSparkleUpdater()
-        }
-        return nil
-    }
-
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -510,9 +501,19 @@ struct AboutSettingsSection: View {
                     }
 
                     Button("Kiểm tra cập nhật") {
-                        // Use Sparkle's check for updates (same as menu bar)
-                        updater?.checkForUpdates()
+                        // Temporarily lower the Settings window level so Sparkle dialog appears on top
+                        if let settingsWindow = NSApp.keyWindow {
+                            settingsWindow.level = .normal
+                        }
+                        
+                        // Use AppDelegate.shared for reliable access
+                        if let appDelegate = AppDelegate.shared {
+                            appDelegate.checkForUpdatesFromUI()
+                        } else if let delegate = NSApplication.shared.delegate as? AppDelegate {
+                            delegate.checkForUpdatesFromUI()
+                        }
                     }
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
                 }
                 .padding(.vertical, 10)
@@ -536,6 +537,7 @@ struct AboutSettingsSection: View {
         }
     }
 }
+
 
 
 // MARK: - Macro Settings Section (Embedded)

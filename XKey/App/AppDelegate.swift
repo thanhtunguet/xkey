@@ -11,6 +11,11 @@ import Sparkle
 
 class AppDelegate: NSObject, NSApplicationDelegate {
 
+    // MARK: - Shared Instance
+    
+    /// Shared instance for access from SwiftUI views
+    static var shared: AppDelegate?
+    
     // MARK: - Properties
 
     private var statusBarManager: StatusBarManager?
@@ -70,6 +75,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Application Lifecycle
     
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Set shared instance for access from SwiftUI views
+        AppDelegate.shared = self
+        
         // Create debug window first
         setupDebugWindow()
         
@@ -878,8 +886,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func checkForUpdates() {
         debugWindowController?.logEvent("🔍 Manually checking for updates...")
+        // Activate app to bring update dialog to front
+        NSApp.activate(ignoringOtherApps: true)
         updaterController?.updater.checkForUpdates()
     }
+    
+    /// Check for updates from SwiftUI views (activates app to bring dialog to front)
+    func checkForUpdatesFromUI() {
+        debugWindowController?.logEvent("🔍 [UI] Manually checking for updates...")
+        
+        // Must be called on main thread
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Activate app to bring update dialog to front
+            NSApp.activate(ignoringOtherApps: true)
+            
+            // Use the same method as menu bar - updater.checkForUpdates()
+            if let updater = self.updaterController?.updater {
+                self.debugWindowController?.logEvent("✅ [UI] Calling updater.checkForUpdates()")
+                updater.checkForUpdates()
+            } else {
+                self.debugWindowController?.logEvent("❌ [UI] updaterController or updater is nil!")
+            }
+        }
+    }
+
 
     private func setupSparkleUpdater() {
         do {

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Sparkle
 
 struct PreferencesView: View {
     @StateObject private var viewModel = PreferencesViewModel()
@@ -104,14 +103,6 @@ struct PreferencesView: View {
 // MARK: - Tab 0: About
 
 struct AboutTab: View {
-    // Access to Sparkle updater from AppDelegate
-    private var updater: SPUUpdater? {
-        if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
-            return appDelegate.getSparkleUpdater()
-        }
-        return nil
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .center, spacing: 20) {
@@ -178,8 +169,10 @@ struct AboutTab: View {
                             .foregroundColor(.secondary)
 
                         Button("Kiểm tra cập nhật") {
-                            // Use Sparkle's check for updates (same as menu bar)
-                            updater?.checkForUpdates()
+                            // Use the new method that handles SwiftUI context properly
+                            if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+                                appDelegate.checkForUpdatesFromUI()
+                            }
                         }
                         .buttonStyle(.borderedProminent)
                     }

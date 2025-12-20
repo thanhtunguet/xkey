@@ -109,6 +109,44 @@ def find_dmg_asset(assets: List[Dict]) -> Optional[Dict]:
     
     return None
 
+def find_signature_asset(assets: List[Dict]) -> Optional[Dict]:
+    """Find the EdDSA signature file in release assets"""
+    for asset in assets:
+        if asset['name'] == 'signature.txt':
+            return asset
+    return None
+
+def fetch_signature(signature_asset: Dict, token: Optional[str] = None) -> Optional[str]:
+    """Fetch the EdDSA signature content from the asset"""
+    if not signature_asset:
+        return None
+    
+    url = signature_asset['browser_download_url']
+    headers = {
+        'User-Agent': 'XKey-Appcast-Generator'
+    }
+    
+    if token:
+        headers['Authorization'] = f'token {token}'
+    
+    req = urllib.request.Request(url, headers=headers)
+    
+    try:
+        with urllib.request.urlopen(req) as response:
+            content = response.read().decode().strip()
+            # The signature file may contain just the signature or be in format:
+            # sparkle:edSignature="..." length="..."
+            # Extract just the signature
+            if 'sparkle:edSignature=' in content:
+                import re
+                match = re.search(r'sparkle:edSignature="([^"]+)"', content)
+                if match:
+                    return match.group(1)
+            return content
+    except urllib.error.HTTPError as e:
+        print(f"Warning: Could not fetch signature: {e}", file=sys.stderr)
+        return None
+
 def format_rfc822_date(iso_date: str) -> str:
     """Convert ISO 8601 date to RFC 822 format"""
     dt = datetime.fromisoformat(iso_date.replace('Z', '+00:00'))
@@ -145,6 +183,14 @@ def generate_appcast_xml(repo: str, token: Optional[str] = None) -> str:
             print(f"Warning: No DMG found for release {release['tag_name']}", file=sys.stderr)
             continue
         
+        # Find and fetch EdDSA signature
+        signature_asset = find_signature_asset(release.get('assets', []))
+        ed_signature = fetch_signature(signature_asset, token)
+        
+        if not ed_signature:
+            print(f"Warning: No EdDSA signature found for release {release['tag_name']}", file=sys.stderr)
+            print(f"         Update validation will fail without signature!", file=sys.stderr)
+        
         # Extract version from tag (remove 'v' prefix if present)
         version = release['tag_name'].lstrip('v')
         
@@ -161,6 +207,21 @@ def generate_appcast_xml(repo: str, token: Optional[str] = None) -> str:
         pub_date = release.get('published_at', release.get('created_at'))
         formatted_date = format_rfc822_date(pub_date)
         
+        # Build enclosure attributes
+        enclosure_attrs = [
+            f'url="{dmg_asset["browser_download_url"]}"',
+            f'sparkle:version="{version}"',
+            f'sparkle:shortVersionString="{version}"',
+            f'length="{dmg_asset["size"]}"',
+            'type="application/octet-stream"',
+        ]
+        
+        # Add EdDSA signature if available
+        if ed_signature:
+            enclosure_attrs.append(f'sparkle:edSignature="{ed_signature}"')
+        
+        enclosure_str = ' '.join(enclosure_attrs)
+        
         # Add item
         xml_lines.extend([
             '    <item>',
@@ -173,12 +234,7 @@ def generate_appcast_xml(repo: str, token: Optional[str] = None) -> str:
             f'      ]]></description>',
             f'      <pubDate>{formatted_date}</pubDate>',
             f'      <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>',
-            f'      <enclosure ',
-            f'        url="{dmg_asset["browser_download_url"]}" ',
-            f'        sparkle:version="{version}" ',
-            f'        sparkle:shortVersionString="{version}" ',
-            f'        length="{dmg_asset["size"]}" ',
-            f'        type="application/octet-stream" />',
+            f'      <enclosure {enclosure_str} />',
             '    </item>',
         ])
         
