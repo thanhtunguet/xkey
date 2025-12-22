@@ -2645,10 +2645,6 @@ extension VNEngine {
         // This enables "free mark" feature - user can add marks to previous word after backspace
         // OpenKey behavior: saveWord() is called before startNewSession()
 
-        // Save macroKey before reset if word break char is a special char
-        // This preserves special chars like "!" so "!bb" macro can work
-        let savedMacroKey = hookState.macroKey
-
         // If we already have spaces saved, save them first
         if spaceCount > 0 {
             saveWord(keyCode: VietnameseData.KEY_SPACE, count: spaceCount)
@@ -2658,16 +2654,24 @@ extension VNEngine {
         // Save current word
         saveWord()
 
-        // Increment space count for the current space
-        spaceCount = 1
+        // Only reset session and clear macroKey for SPACE
+        // For other special characters (!, @, #, etc.), we preserve macroKey
+        // to allow macros like "!bb" or "@hello"
+        if isSpace {
+            // Increment space count for the current space
+            spaceCount = 1
 
-        // Start new session but DON'T clear typingStates
-        startNewSession()
-
-        // Restore macroKey if it had a special character
-        // This allows macros like "!bb" where "!" starts the macro
-        if !savedMacroKey.isEmpty {
-            hookState.macroKey = savedMacroKey
+            // Start new session and clear macroKey
+            // This ensures each word after SPACE starts fresh
+            startNewSession()
+            
+            // macroKey is cleared by startNewSession()
+            // This allows macros like "hello" -> "hello world" to work correctly
+        } else {
+            // For non-space word breaks (!, @, #, etc.), don't reset session
+            // macroKey is preserved to build macros like "!bb"
+            // Just increment space count
+            spaceCount = 1
         }
         
         // Reset spell checking to original setting

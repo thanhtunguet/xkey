@@ -80,22 +80,8 @@ class MacroManager {
         // Convert key to character codes
         let searchKey = key.map { getCharacterCode($0) }
 
-        // Debug logging
-        let keyStr = key.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-        let searchKeyStr = searchKey.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-        logCallback?("🔍 MacroManager.findMacro: input key=[\(keyStr)]")
-        logCallback?("🔍 MacroManager.findMacro: searchKey=[\(searchKeyStr)]")
-        logCallback?("🔍 MacroManager.findMacro: macroMap has \(macroMap.count) macros")
-
-        // Debug: show all stored macros
-        for (storedKey, macro) in macroMap {
-            let storedKeyStr = storedKey.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-            logCallback?("🔍   - Stored macro: key=[\(storedKeyStr)] text='\(macro.macroText)'")
-        }
-
         // Try exact match first
         if let macro = macroMap[searchKey] {
-            logCallback?("🔍 MacroManager.findMacro: FOUND exact match! text='\(macro.macroText)', content='\(macro.macroContent)'")
             return macro.macroContentCode
         }
         
