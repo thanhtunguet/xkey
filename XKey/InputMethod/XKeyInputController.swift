@@ -62,21 +62,36 @@ class XKeyInputController: IMKInputController {
     // MARK: - Settings
     
     private func loadSettings() {
-        // Load from shared UserDefaults (app group)
+        // Load from shared plist file
         // This allows settings to be shared between XKey and XKeyIM
-        let defaults = UserDefaults(suiteName: "group.com.codetay.inputmethod.XKey")
+        let appGroup = "group.com.codetay.inputmethod.XKey"
+        
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+            return
+        }
+        
+        let plistURL = containerURL.appendingPathComponent("Library/Preferences/\(appGroup).plist")
+        
+        guard let data = try? Data(contentsOf: plistURL),
+              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+            return
+        }
 
-        if let methodRaw = defaults?.integer(forKey: "XKey.inputMethod"),
+        if let methodRaw = dict["XKey.inputMethod"] as? Int,
            let method = InputMethod(rawValue: methodRaw) {
             inputMethod = method
         }
 
-        if let tableRaw = defaults?.integer(forKey: "XKey.codeTable"),
+        if let tableRaw = dict["XKey.codeTable"] as? Int,
            let table = CodeTable(rawValue: tableRaw) {
             codeTable = table
         }
 
-        useMarkedText = defaults?.bool(forKey: "XKey.imkitUseMarkedText") ?? false
+        if let markedText = dict["XKey.imkitUseMarkedText"] as? Bool {
+            useMarkedText = markedText
+        } else if let markedText = dict["XKey.imkitUseMarkedText"] as? Int {
+            useMarkedText = markedText != 0
+        }
 
         // Update engine settings
         var settings = VNEngine.EngineSettings()

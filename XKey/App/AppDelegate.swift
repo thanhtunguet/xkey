@@ -196,6 +196,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.setupReadWordCallback { [weak self] in
                 self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
             }
+            
+            // Setup verbose logging callback - sync with keyboardHandler
+            debugWindowController?.setupVerboseLoggingCallback { [weak self] isVerbose in
+                self?.keyboardHandler?.verboseEngineLogging = isVerbose
+                self?.debugWindowController?.logEvent(isVerbose ? "🔍 Verbose engine logging ENABLED (may cause lag)" : "🔍 Verbose engine logging DISABLED")
+            }
         }
     }
 
@@ -376,6 +382,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardHandler?.codeTable = preferences.codeTable
         keyboardHandler?.modernStyle = preferences.modernStyle
         keyboardHandler?.spellCheckEnabled = preferences.spellCheckEnabled
+        keyboardHandler?.englishDetectionEnabled = preferences.englishDetectionEnabled
         keyboardHandler?.fixAutocomplete = preferences.fixAutocomplete
         
         // Apply advanced features
@@ -440,11 +447,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugWindowController?.setupReadWordCallback { [weak self] in
                     self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
                 }
+                // Setup verbose logging callback - sync with keyboardHandler
+                debugWindowController?.setupVerboseLoggingCallback { [weak self] isVerbose in
+                    self?.keyboardHandler?.verboseEngineLogging = isVerbose
+                    self?.debugWindowController?.logEvent(isVerbose ? "🔍 Verbose engine logging ENABLED (may cause lag)" : "🔍 Verbose engine logging DISABLED")
+                }
                 debugWindowController?.logEvent("✅ Debug window enabled via settings")
             }
             debugWindowController?.showWindow(nil)
         } else {
-            // Disable debug window
+            // Disable debug window - also disable verbose logging
+            keyboardHandler?.verboseEngineLogging = false
             if let window = debugWindowController?.window {
                 window.close()
                 debugWindowController = nil

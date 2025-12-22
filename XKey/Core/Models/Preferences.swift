@@ -33,6 +33,7 @@ struct Preferences: Codable {
     var codeTable: CodeTable = .unicode
     var modernStyle: Bool = false
     var spellCheckEnabled: Bool = false
+    var englishDetectionEnabled: Bool = false  // Experimental: Skip Vietnamese processing for English words
     var fixAutocomplete: Bool = true
     
     // Advanced features

@@ -719,8 +719,13 @@ class AppBehaviorDetector {
             }
         }
         
-        // Then search in built-in rules
-        for rule in Self.builtInWindowTitleRules where rule.isEnabled {
+        // Then search in built-in rules (check disabled list from preferences)
+        let disabledBuiltInRules = SharedSettings.shared.getDisabledBuiltInRules()
+        for rule in Self.builtInWindowTitleRules {
+            // Skip if rule is disabled in preferences
+            if disabledBuiltInRules.contains(rule.name) {
+                continue
+            }
             if rule.matches(bundleId: bundleId, windowTitle: windowTitle) {
                 cachedMatchedRule = rule
                 return rule
@@ -751,7 +756,7 @@ class AppBehaviorDetector {
     
     /// Load custom rules from preferences
     func loadCustomRules() {
-        if let data = UserDefaults.standard.data(forKey: "WindowTitleRules"),
+        if let data = SharedSettings.shared.getWindowTitleRulesData(),
            let rules = try? JSONDecoder().decode([WindowTitleRule].self, from: data) {
             customRules = rules
         }
@@ -760,7 +765,7 @@ class AppBehaviorDetector {
     /// Save custom rules to preferences
     func saveCustomRules() {
         if let data = try? JSONEncoder().encode(customRules) {
-            UserDefaults.standard.set(data, forKey: "WindowTitleRules")
+            SharedSettings.shared.setWindowTitleRulesData(data)
         }
     }
     
@@ -792,9 +797,32 @@ class AppBehaviorDetector {
         return customRules
     }
     
-    /// Get all built-in rules
+    /// Get all built-in rules with their enabled state from preferences
     func getBuiltInRules() -> [WindowTitleRule] {
-        return Self.builtInWindowTitleRules
+        let disabledNames = SharedSettings.shared.getDisabledBuiltInRules()
+        return Self.builtInWindowTitleRules.map { rule in
+            var mutableRule = rule
+            mutableRule.isEnabled = !disabledNames.contains(rule.name)
+            return mutableRule
+        }
+    }
+    
+    /// Toggle a built-in rule's enabled state
+    func toggleBuiltInRule(_ ruleName: String, enabled: Bool) {
+        var disabledNames = SharedSettings.shared.getDisabledBuiltInRules()
+        if enabled {
+            disabledNames.remove(ruleName)
+        } else {
+            disabledNames.insert(ruleName)
+        }
+        SharedSettings.shared.setDisabledBuiltInRules(disabledNames)
+        clearCache()
+    }
+    
+    /// Check if a built-in rule is enabled
+    func isBuiltInRuleEnabled(_ ruleName: String) -> Bool {
+        let disabledNames = SharedSettings.shared.getDisabledBuiltInRules()
+        return !disabledNames.contains(ruleName)
     }
     
     private func detectBehavior(for bundleId: String) -> AppBehavior {
@@ -1016,7 +1044,7 @@ class AppBehaviorDetector {
         
         // Microsoft Office
         if Self.microsoftOfficeApps.contains(bundleId) {
-            if role == "AXTextArea" {
+            if role == "AXTextArea" || role == "AXLayoutArea" {
                 return InjectionMethodInfo(
                     method: .fast,
                     delays: (2000, 5000, 2000),

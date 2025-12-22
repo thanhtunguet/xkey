@@ -25,6 +25,7 @@ enum SharedSettingsKey: String {
     case codeTable = "XKey.codeTable"
     case modernStyle = "XKey.modernStyle"
     case spellCheckEnabled = "XKey.spellCheckEnabled"
+    case englishDetectionEnabled = "XKey.englishDetectionEnabled"
     case fixAutocomplete = "XKey.fixAutocomplete"
 
     // Advanced settings
@@ -68,9 +69,17 @@ enum SharedSettingsKey: String {
 
     // Input Source Management
     case inputSourceConfig = "XKey.inputSourceConfig"
+    
+    // Local data (macros, window title rules)
+    case macrosData = "XKey.macrosData"
+    case windowTitleRules = "XKey.windowTitleRules"
+    case disabledBuiltInRules = "XKey.disabledBuiltInRules"
 }
 
+// Note: Logging functions (logError, logWarning, etc.) are provided by Shared/DebugLogger.swift
+
 /// Manager for shared settings between XKey and XKeyIM
+/// ARCHITECTURE: Uses plist file directly for reliable cross-process sync
 class SharedSettings {
     
     // MARK: - Singleton
@@ -78,476 +87,440 @@ class SharedSettings {
     static let shared = SharedSettings()
     
     // MARK: - Properties
-    
-    /// Shared UserDefaults using App Group
-    private let sharedDefaults: UserDefaults?
-    
-    /// Local UserDefaults (fallback)
-    private let localDefaults = UserDefaults.standard
-
-    /// Whether App Group is available
-    var isAppGroupAvailable: Bool {
-        return sharedDefaults != nil
-    }
 
     /// Flag to prevent notification spam during batch updates
     private var isBatchUpdating: Bool = false
     
+    /// Default values for settings
+    private let defaultValues: [String: Any] = [
+        SharedSettingsKey.inputMethod.rawValue: InputMethod.telex.rawValue,
+        SharedSettingsKey.codeTable.rawValue: CodeTable.unicode.rawValue,
+        SharedSettingsKey.modernStyle.rawValue: false,
+        SharedSettingsKey.spellCheckEnabled.rawValue: false,
+        SharedSettingsKey.englishDetectionEnabled.rawValue: false,
+        SharedSettingsKey.quickTelexEnabled.rawValue: true,
+        SharedSettingsKey.restoreIfWrongSpelling.rawValue: true,
+        SharedSettingsKey.freeMarkEnabled.rawValue: false,
+        SharedSettingsKey.imkitUseMarkedText.rawValue: true,
+        SharedSettingsKey.fixAutocomplete.rawValue: true
+    ]
+    
+    /// Cache of plist URL (computed once)
+    private lazy var plistURL: URL? = {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: kXKeyAppGroup) else {
+            sharedLogWarning("Cannot get App Group container URL")
+            return nil
+        }
+        
+        let prefsDir = containerURL.appendingPathComponent("Library/Preferences")
+        // Ensure directory exists
+        try? FileManager.default.createDirectory(at: prefsDir, withIntermediateDirectories: true)
+        
+        return prefsDir.appendingPathComponent("\(kXKeyAppGroup).plist")
+    }()
+    
     // MARK: - Initialization
 
     private init() {
-        // Try to use App Group UserDefaults
-        sharedDefaults = UserDefaults(suiteName: kXKeyAppGroup)
-
-        // Register default values
-        registerDefaults()
-
-        // Restore settings from backup if App Group is empty
-        restoreFromBackupIfNeeded()
+        // No migration needed - plist is the only source of truth
     }
 
-    /// Register default values for settings
-    private func registerDefaults() {
-        let defaultValues: [String: Any] = [
-            SharedSettingsKey.inputMethod.rawValue: InputMethod.telex.rawValue,
-            SharedSettingsKey.codeTable.rawValue: CodeTable.unicode.rawValue,
-            SharedSettingsKey.modernStyle.rawValue: false,
-            SharedSettingsKey.spellCheckEnabled.rawValue: false,
-            SharedSettingsKey.quickTelexEnabled.rawValue: true,
-            SharedSettingsKey.restoreIfWrongSpelling.rawValue: true,
-            SharedSettingsKey.freeMarkEnabled.rawValue: false,
-            SharedSettingsKey.imkitUseMarkedText.rawValue: false,
-            SharedSettingsKey.fixAutocomplete.rawValue: true
-        ]
-
-        defaults.register(defaults: defaultValues)
+    // MARK: - Plist Read/Write Helpers
+    
+    /// Read the entire plist dictionary
+    private func readPlistDict() -> [String: Any] {
+        guard let url = plistURL,
+              let data = try? Data(contentsOf: url),
+              let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+            return [:]
+        }
+        return dict
     }
-
-    /// Restore settings from UserDefaults.standard backup if App Group is empty
-    private func restoreFromBackupIfNeeded() {
-        // Only restore if we're using App Group
-        guard let shared = sharedDefaults else { return }
-
-        // Check if App Group has settings (check a key that should always exist)
-        let hasSettings = shared.object(forKey: SharedSettingsKey.inputMethod.rawValue) != nil
-
-        // If App Group is empty but standard defaults has backup, restore it
-        if !hasSettings {
-            let hasBackup = localDefaults.object(forKey: SharedSettingsKey.inputMethod.rawValue) != nil
-
-            if hasBackup {
-                logInfo("Restoring from backup...", source: "SharedSettings")
-
-                // Restore all settings from standard defaults to App Group
-                for key in getAllSettingsKeys() {
-                    if let value = localDefaults.object(forKey: key) {
-                        shared.set(value, forKey: key)
-                    }
-                }
-
-                shared.synchronize()
-                logSuccess("Restored from backup successfully", source: "SharedSettings")
-            }
+    
+    /// Write the entire plist dictionary
+    private func writePlistDict(_ dict: [String: Any]) {
+        guard let url = plistURL else { return }
+        
+        do {
+            let data = try PropertyListSerialization.data(fromPropertyList: dict, format: .binary, options: 0)
+            try data.write(to: url)
+        } catch {
+            sharedLogError("Failed to write plist: \(error)")
         }
     }
-
-    /// Get all settings keys for backup/restore
-    private func getAllSettingsKeys() -> [String] {
-        return [
-            SharedSettingsKey.toggleHotkeyCode.rawValue,
-            SharedSettingsKey.toggleHotkeyModifiers.rawValue,
-            SharedSettingsKey.toggleHotkeyIsModifierOnly.rawValue,
-            SharedSettingsKey.undoTypingEnabled.rawValue,
-            SharedSettingsKey.beepOnToggle.rawValue,
-            SharedSettingsKey.inputMethod.rawValue,
-            SharedSettingsKey.codeTable.rawValue,
-            SharedSettingsKey.modernStyle.rawValue,
-            SharedSettingsKey.spellCheckEnabled.rawValue,
-            SharedSettingsKey.fixAutocomplete.rawValue,
-            SharedSettingsKey.quickTelexEnabled.rawValue,
-            SharedSettingsKey.quickStartConsonantEnabled.rawValue,
-            SharedSettingsKey.quickEndConsonantEnabled.rawValue,
-            SharedSettingsKey.upperCaseFirstChar.rawValue,
-            SharedSettingsKey.restoreIfWrongSpelling.rawValue,
-            SharedSettingsKey.allowConsonantZFWJ.rawValue,
-            SharedSettingsKey.freeMarkEnabled.rawValue,
-            SharedSettingsKey.tempOffSpellingEnabled.rawValue,
-            SharedSettingsKey.tempOffEngineEnabled.rawValue,
-            SharedSettingsKey.macroEnabled.rawValue,
-            SharedSettingsKey.macroInEnglishMode.rawValue,
-            SharedSettingsKey.autoCapsMacro.rawValue,
-            SharedSettingsKey.macros.rawValue,
-            SharedSettingsKey.smartSwitchEnabled.rawValue,
-            SharedSettingsKey.detectOverlayApps.rawValue,
-            SharedSettingsKey.debugModeEnabled.rawValue,
-            SharedSettingsKey.imkitEnabled.rawValue,
-            SharedSettingsKey.imkitUseMarkedText.rawValue,
-            SharedSettingsKey.switchToXKeyHotkeyCode.rawValue,
-            SharedSettingsKey.switchToXKeyHotkeyModifiers.rawValue,
-            SharedSettingsKey.switchToXKeyHotkeyIsModifierOnly.rawValue,
-            SharedSettingsKey.showDockIcon.rawValue,
-            SharedSettingsKey.startAtLogin.rawValue,
-            SharedSettingsKey.menuBarIconStyle.rawValue,
-            SharedSettingsKey.excludedApps.rawValue,
-            SharedSettingsKey.inputSourceConfig.rawValue
-        ]
+    
+    /// Read a Bool value from plist
+    private func readBool(forKey key: String) -> Bool {
+        let dict = readPlistDict()
+        
+        if let value = dict[key] as? Bool {
+            return value
+        }
+        if let value = dict[key] as? Int {
+            return value != 0
+        }
+        
+        // Return default value if key not found
+        return defaultValues[key] as? Bool ?? false
     }
-
-    // MARK: - Defaults Access
-
-    /// Get the appropriate UserDefaults (shared if available, local otherwise)
-    private var defaults: UserDefaults {
-        return sharedDefaults ?? localDefaults
+    
+    /// Write a Bool value to plist
+    private func writeBool(_ value: Bool, forKey key: String) {
+        var dict = readPlistDict()
+        dict[key] = value
+        writePlistDict(dict)
+    }
+    
+    /// Read an Int value from plist
+    private func readInt(forKey key: String) -> Int {
+        let dict = readPlistDict()
+        
+        if let value = dict[key] as? Int {
+            return value
+        }
+        
+        // Return default value if key not found
+        return defaultValues[key] as? Int ?? 0
+    }
+    
+    /// Write an Int value to plist
+    private func writeInt(_ value: Int, forKey key: String) {
+        var dict = readPlistDict()
+        dict[key] = value
+        writePlistDict(dict)
+    }
+    
+    /// Read a String value from plist
+    private func readString(forKey key: String) -> String? {
+        let dict = readPlistDict()
+        return dict[key] as? String
+    }
+    
+    /// Write a String value to plist
+    private func writeString(_ value: String, forKey key: String) {
+        var dict = readPlistDict()
+        dict[key] = value
+        writePlistDict(dict)
+    }
+    
+    /// Read a Data value from plist
+    private func readData(forKey key: String) -> Data? {
+        let dict = readPlistDict()
+        return dict[key] as? Data
+    }
+    
+    /// Write a Data value to plist
+    private func writeData(_ value: Data, forKey key: String) {
+        var dict = readPlistDict()
+        dict[key] = value
+        writePlistDict(dict)
     }
     
     // MARK: - Hotkey Settings
 
     var toggleHotkeyCode: UInt16 {
-        get { UInt16(defaults.integer(forKey: SharedSettingsKey.toggleHotkeyCode.rawValue)) }
-        set { defaults.set(Int(newValue), forKey: SharedSettingsKey.toggleHotkeyCode.rawValue) }
+        get { UInt16(readInt(forKey: SharedSettingsKey.toggleHotkeyCode.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleHotkeyCode.rawValue) }
     }
 
     var toggleHotkeyModifiers: UInt {
-        get { UInt(defaults.integer(forKey: SharedSettingsKey.toggleHotkeyModifiers.rawValue)) }
-        set { defaults.set(Int(newValue), forKey: SharedSettingsKey.toggleHotkeyModifiers.rawValue) }
+        get { UInt(readInt(forKey: SharedSettingsKey.toggleHotkeyModifiers.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.toggleHotkeyModifiers.rawValue) }
     }
 
     var toggleHotkeyIsModifierOnly: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.toggleHotkeyIsModifierOnly.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.toggleHotkeyIsModifierOnly.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.toggleHotkeyIsModifierOnly.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.toggleHotkeyIsModifierOnly.rawValue) }
     }
 
     var undoTypingEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.undoTypingEnabled.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.undoTypingEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.undoTypingEnabled.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.undoTypingEnabled.rawValue) }
     }
 
     var beepOnToggle: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.beepOnToggle.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.beepOnToggle.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.beepOnToggle.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.beepOnToggle.rawValue) }
     }
 
     // MARK: - Input Method Settings
 
     var inputMethod: Int {
-        get { defaults.integer(forKey: SharedSettingsKey.inputMethod.rawValue) }
+        get { readInt(forKey: SharedSettingsKey.inputMethod.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.inputMethod.rawValue)
-
-            // CRITICAL: Also write directly to plist file to bypass cfprefsd caching
-            // This ensures XKeyIM will read the latest value
-            writeDirectlyToPlist(key: SharedSettingsKey.inputMethod.rawValue, value: newValue)
-
+            writeInt(newValue, forKey: SharedSettingsKey.inputMethod.rawValue)
             notifySettingsChanged()
         }
     }
 
     var codeTable: Int {
-        get { defaults.integer(forKey: SharedSettingsKey.codeTable.rawValue) }
+        get { readInt(forKey: SharedSettingsKey.codeTable.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.codeTable.rawValue)
+            writeInt(newValue, forKey: SharedSettingsKey.codeTable.rawValue)
             notifySettingsChanged()
         }
     }
 
     var modernStyle: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.modernStyle.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.modernStyle.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.modernStyle.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.modernStyle.rawValue)
             notifySettingsChanged()
         }
     }
 
     var spellCheckEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.spellCheckEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.spellCheckEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.spellCheckEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.spellCheckEnabled.rawValue)
+            notifySettingsChanged()
+        }
+    }
+
+    var englishDetectionEnabled: Bool {
+        get { readBool(forKey: SharedSettingsKey.englishDetectionEnabled.rawValue) }
+        set {
+            writeBool(newValue, forKey: SharedSettingsKey.englishDetectionEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var fixAutocomplete: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.fixAutocomplete.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.fixAutocomplete.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.fixAutocomplete.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.fixAutocomplete.rawValue) }
     }
 
     // MARK: - Advanced Settings
 
     var quickTelexEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.quickTelexEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.quickTelexEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.quickTelexEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.quickTelexEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var quickStartConsonantEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.quickStartConsonantEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.quickStartConsonantEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.quickStartConsonantEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.quickStartConsonantEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var quickEndConsonantEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.quickEndConsonantEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.quickEndConsonantEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.quickEndConsonantEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.quickEndConsonantEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var upperCaseFirstChar: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.upperCaseFirstChar.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.upperCaseFirstChar.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.upperCaseFirstChar.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.upperCaseFirstChar.rawValue) }
     }
 
     var restoreIfWrongSpelling: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.restoreIfWrongSpelling.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.restoreIfWrongSpelling.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.restoreIfWrongSpelling.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.restoreIfWrongSpelling.rawValue)
             notifySettingsChanged()
         }
     }
 
     var allowConsonantZFWJ: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.allowConsonantZFWJ.rawValue) }
     }
 
     var freeMarkEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.freeMarkEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.freeMarkEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.freeMarkEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.freeMarkEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var tempOffSpellingEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.tempOffSpellingEnabled.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.tempOffSpellingEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.tempOffSpellingEnabled.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.tempOffSpellingEnabled.rawValue) }
     }
 
     var tempOffEngineEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.tempOffEngineEnabled.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.tempOffEngineEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.tempOffEngineEnabled.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.tempOffEngineEnabled.rawValue) }
     }
 
     // MARK: - Macro Settings
 
     var macroEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.macroEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.macroEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.macroEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.macroEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var macroInEnglishMode: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.macroInEnglishMode.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.macroInEnglishMode.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.macroInEnglishMode.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.macroInEnglishMode.rawValue) }
     }
 
     var autoCapsMacro: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.autoCapsMacro.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.autoCapsMacro.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.autoCapsMacro.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.autoCapsMacro.rawValue) }
     }
 
     func getMacros() -> Data? {
-        return defaults.data(forKey: SharedSettingsKey.macros.rawValue)
+        return readData(forKey: SharedSettingsKey.macros.rawValue)
     }
 
     func setMacros(_ data: Data) {
-        defaults.set(data, forKey: SharedSettingsKey.macros.rawValue)
+        writeData(data, forKey: SharedSettingsKey.macros.rawValue)
         notifySettingsChanged()
     }
 
     // MARK: - Smart Switch Settings
 
     var smartSwitchEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.smartSwitchEnabled.rawValue) }
     }
 
     var detectOverlayApps: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.detectOverlayApps.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.detectOverlayApps.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.detectOverlayApps.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.detectOverlayApps.rawValue) }
     }
 
     // MARK: - Debug Settings
 
     var debugModeEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.debugModeEnabled.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.debugModeEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.debugModeEnabled.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.debugModeEnabled.rawValue) }
     }
 
     // MARK: - IMKit Settings
 
     var imkitEnabled: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.imkitEnabled.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.imkitEnabled.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.imkitEnabled.rawValue)
+            writeBool(newValue, forKey: SharedSettingsKey.imkitEnabled.rawValue)
             notifySettingsChanged()
         }
     }
 
     var imkitUseMarkedText: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.imkitUseMarkedText.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.imkitUseMarkedText.rawValue) }
         set {
-            defaults.set(newValue, forKey: SharedSettingsKey.imkitUseMarkedText.rawValue)
-
-            // CRITICAL: Also write directly to plist file to bypass cfprefsd caching
-            // This ensures XKeyIM will read the latest value
-            writeDirectlyToPlist(key: SharedSettingsKey.imkitUseMarkedText.rawValue, value: newValue)
-
+            writeBool(newValue, forKey: SharedSettingsKey.imkitUseMarkedText.rawValue)
             notifySettingsChanged()
         }
     }
 
     var switchToXKeyHotkeyCode: UInt16 {
-        get { UInt16(defaults.integer(forKey: SharedSettingsKey.switchToXKeyHotkeyCode.rawValue)) }
-        set { defaults.set(Int(newValue), forKey: SharedSettingsKey.switchToXKeyHotkeyCode.rawValue) }
+        get { UInt16(readInt(forKey: SharedSettingsKey.switchToXKeyHotkeyCode.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.switchToXKeyHotkeyCode.rawValue) }
     }
 
     var switchToXKeyHotkeyModifiers: UInt {
-        get { UInt(defaults.integer(forKey: SharedSettingsKey.switchToXKeyHotkeyModifiers.rawValue)) }
-        set { defaults.set(Int(newValue), forKey: SharedSettingsKey.switchToXKeyHotkeyModifiers.rawValue) }
+        get { UInt(readInt(forKey: SharedSettingsKey.switchToXKeyHotkeyModifiers.rawValue)) }
+        set { writeInt(Int(newValue), forKey: SharedSettingsKey.switchToXKeyHotkeyModifiers.rawValue) }
     }
 
     var switchToXKeyHotkeyIsModifierOnly: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.switchToXKeyHotkeyIsModifierOnly.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.switchToXKeyHotkeyIsModifierOnly.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.switchToXKeyHotkeyIsModifierOnly.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.switchToXKeyHotkeyIsModifierOnly.rawValue) }
     }
 
     // MARK: - UI Settings
 
     var showDockIcon: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.showDockIcon.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.showDockIcon.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.showDockIcon.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.showDockIcon.rawValue) }
     }
 
     var startAtLogin: Bool {
-        get { defaults.bool(forKey: SharedSettingsKey.startAtLogin.rawValue) }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.startAtLogin.rawValue) }
+        get { readBool(forKey: SharedSettingsKey.startAtLogin.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.startAtLogin.rawValue) }
     }
 
     var menuBarIconStyle: String {
-        get { defaults.string(forKey: SharedSettingsKey.menuBarIconStyle.rawValue) ?? "X" }
-        set { defaults.set(newValue, forKey: SharedSettingsKey.menuBarIconStyle.rawValue) }
+        get { readString(forKey: SharedSettingsKey.menuBarIconStyle.rawValue) ?? "X" }
+        set { writeString(newValue, forKey: SharedSettingsKey.menuBarIconStyle.rawValue) }
     }
 
     // MARK: - Excluded Apps
 
     func getExcludedApps() -> Data? {
-        return defaults.data(forKey: SharedSettingsKey.excludedApps.rawValue)
+        return readData(forKey: SharedSettingsKey.excludedApps.rawValue)
     }
 
     func setExcludedApps(_ data: Data) {
-        defaults.set(data, forKey: SharedSettingsKey.excludedApps.rawValue)
+        writeData(data, forKey: SharedSettingsKey.excludedApps.rawValue)
     }
 
     // MARK: - Input Source Management
 
     func getInputSourceConfig() -> Data? {
-        return defaults.data(forKey: SharedSettingsKey.inputSourceConfig.rawValue)
+        return readData(forKey: SharedSettingsKey.inputSourceConfig.rawValue)
     }
 
     func setInputSourceConfig(_ data: Data) {
-        defaults.set(data, forKey: SharedSettingsKey.inputSourceConfig.rawValue)
+        writeData(data, forKey: SharedSettingsKey.inputSourceConfig.rawValue)
+    }
+    
+    // MARK: - Macros Data
+    
+    func getMacrosData() -> Data? {
+        return readData(forKey: SharedSettingsKey.macrosData.rawValue)
+    }
+    
+    func setMacrosData(_ data: Data) {
+        writeData(data, forKey: SharedSettingsKey.macrosData.rawValue)
+    }
+    
+    // MARK: - Window Title Rules
+    
+    func getWindowTitleRulesData() -> Data? {
+        return readData(forKey: SharedSettingsKey.windowTitleRules.rawValue)
+    }
+    
+    func setWindowTitleRulesData(_ data: Data) {
+        writeData(data, forKey: SharedSettingsKey.windowTitleRules.rawValue)
+    }
+    
+    // MARK: - Disabled Built-in Rules
+    
+    /// Get the list of disabled built-in rule names
+    func getDisabledBuiltInRules() -> Set<String> {
+        guard let data = readData(forKey: SharedSettingsKey.disabledBuiltInRules.rawValue),
+              let names = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return Set(names)
+    }
+    
+    /// Set the list of disabled built-in rule names
+    func setDisabledBuiltInRules(_ names: Set<String>) {
+        if let data = try? JSONEncoder().encode(Array(names)) {
+            writeData(data, forKey: SharedSettingsKey.disabledBuiltInRules.rawValue)
+        }
     }
 
     // MARK: - Sync
 
-    /// Synchronize settings to disk with dual backup
+    /// Synchronize settings to disk
+    /// Note: With plist-only approach, settings are written immediately
+    /// This function is kept for compatibility but does nothing
     func synchronize() {
-        // Save to primary storage (App Group or local)
-        defaults.synchronize()
-
-        // CRITICAL: Force flush using CFPreferences for cross-process sync
-        // Use CFPreferencesSynchronize with full parameters for maximum reliability
-        CFPreferencesSynchronize(
-            kXKeyAppGroup as CFString,
-            kCFPreferencesCurrentUser,
-            kCFPreferencesAnyHost
-        )
-
-        // CRITICAL: Also backup to UserDefaults.standard as failsafe
-        // This ensures settings persist even if App Group container changes
-        backupToStandardDefaults()
-    }
-
-    /// Backup all settings to UserDefaults.standard as failsafe
-    private func backupToStandardDefaults() {
-        // Only backup if we're using App Group (otherwise we'd create duplicate)
-        guard sharedDefaults != nil else { return }
-
-        // Backup all settings to standard UserDefaults
-        for key in getAllSettingsKeys() {
-            if let value = sharedDefaults?.object(forKey: key) {
-                localDefaults.set(value, forKey: key)
-            }
-        }
-
-        localDefaults.synchronize()
-    }
-    
-    /// Write directly to plist file to bypass cfprefsd caching
-    /// This is needed because cfprefsd doesn't always flush to disk in time for XKeyIM to read
-    private func writeDirectlyToPlist(key: String, value: Any) {
-        // Skip if in batch mode - we'll write everything at once later
-        guard !isBatchUpdating else { return }
-
-        writeDirectlyToPlistInternal(key: key, value: value)
-    }
-
-    /// Internal plist write function (bypasses batch check)
-    private func writeDirectlyToPlistInternal(key: String, value: Any) {
-        // Get the plist file path in App Group container
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: kXKeyAppGroup) else {
-            logWarning("Cannot get App Group container URL", source: "SharedSettings")
-            return
-        }
-
-        let prefsURL = containerURL.appendingPathComponent("Library/Preferences/\(kXKeyAppGroup).plist")
-
-        // Read existing plist or create new one
-        var plistDict: [String: Any] = [:]
-        if let data = try? Data(contentsOf: prefsURL),
-           let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
-            plistDict = dict
-        }
-
-        // Update the value
-        plistDict[key] = value
-
-        // Write back to file
-        do {
-            let data = try PropertyListSerialization.data(fromPropertyList: plistDict, format: .binary, options: 0)
-            try data.write(to: prefsURL)
-            logSuccess("Wrote \(key)=\(value) directly to plist", source: "SharedSettings")
-        } catch {
-            logError("Failed to write plist: \(error)", source: "SharedSettings")
-        }
+        // No-op: plist writes are immediate
     }
 
     /// Notify that settings have changed (for observers)
     private func notifySettingsChanged() {
         // Skip notification if we're in batch update mode
-        // This prevents notification spam when saving multiple settings at once
         guard !isBatchUpdating else { return }
-
-        // IMPORTANT: Synchronize BEFORE notifying!
-        // This ensures XKeyIM receives the latest values when it reloads
-        defaults.synchronize()
-
-        // CRITICAL: Force CFPreferences to flush to disk immediately
-        // This prevents XKeyIM from reading stale cached values
-        // Use CFPreferencesSynchronize with full parameters for maximum reliability
-        CFPreferencesSynchronize(
-            kXKeyAppGroup as CFString,
-            kCFPreferencesCurrentUser,
-            kCFPreferencesAnyHost
-        )
 
         // Post notification for local observers
         NotificationCenter.default.post(
@@ -560,6 +533,70 @@ class SharedSettings {
             name: .xkeySettingsDidChange,
             object: nil
         )
+    }
+    
+    // MARK: - Export/Import Settings
+    
+    /// Export all settings to a plist file
+    /// - Returns: The exported plist data (XML format for human readability), or nil if export failed
+    func exportSettings() -> Data? {
+        var exportDict = readPlistDict()
+        
+        // Add metadata for version tracking
+        exportDict["_exportVersion"] = 1
+        exportDict["_exportDate"] = ISO8601DateFormatter().string(from: Date())
+        exportDict["_appVersion"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        
+        // Convert to XML plist for human readability
+        do {
+            let data = try PropertyListSerialization.data(fromPropertyList: exportDict, format: .xml, options: 0)
+            return data
+        } catch {
+            sharedLogError("Failed to export settings: \(error)")
+            return nil
+        }
+    }
+    
+    /// Import settings from a plist file
+    /// - Parameter data: The plist data to import
+    /// - Returns: True if import was successful
+    @discardableResult
+    func importSettings(from data: Data) -> Bool {
+        do {
+            guard var importDict = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
+                sharedLogError("Invalid plist format")
+                return false
+            }
+            
+            // Remove metadata keys before writing
+            importDict.removeValue(forKey: "_exportVersion")
+            importDict.removeValue(forKey: "_exportDate")
+            importDict.removeValue(forKey: "_appVersion")
+            
+            // Write all settings
+            writePlistDict(importDict)
+            sharedLogSuccess("Imported settings successfully")
+            
+            // Notify observers
+            notifySettingsChanged()
+            // Post macros notification if available (XKey only, not XKeyIM)
+            if let macrosNotification = Notification.Name(rawValue: "XKey.macrosDidChange") as Notification.Name? {
+                NotificationCenter.default.post(name: macrosNotification, object: nil)
+            }
+            
+            return true
+        } catch {
+            sharedLogError("Failed to import settings: \(error)")
+            return false
+        }
+    }
+    
+    /// Get the suggested filename for export
+    func getExportFileName() -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: Date())
+        return "XKey-Settings-\(dateString).plist"
     }
     
     // MARK: - Load/Save Preferences Object
@@ -590,6 +627,7 @@ class SharedSettings {
         }
         prefs.modernStyle = modernStyle
         prefs.spellCheckEnabled = spellCheckEnabled
+        prefs.englishDetectionEnabled = englishDetectionEnabled
         prefs.fixAutocomplete = fixAutocomplete
 
         // Advanced settings
@@ -667,6 +705,7 @@ class SharedSettings {
         codeTable = prefs.codeTable.rawValue
         modernStyle = prefs.modernStyle
         spellCheckEnabled = prefs.spellCheckEnabled
+        englishDetectionEnabled = prefs.englishDetectionEnabled
         fixAutocomplete = prefs.fixAutocomplete
 
         // Advanced settings
@@ -718,15 +757,10 @@ class SharedSettings {
             setExcludedApps(data)
         }
 
-        // Batch update is done - disable batch mode and write critical values to plist
+        // Batch update is done - settings are already written to plist via setters
         isBatchUpdating = false
 
-        // CRITICAL: Write important values directly to plist to ensure XKeyIM reads them
-        // These are the values that XKeyIM reads directly from plist file
-        writeDirectlyToPlistInternal(key: SharedSettingsKey.inputMethod.rawValue, value: prefs.inputMethod.rawValue)
-        writeDirectlyToPlistInternal(key: SharedSettingsKey.imkitUseMarkedText.rawValue, value: prefs.imkitUseMarkedText)
-
-        // Now send ONE notification
+        // Send ONE notification to notify observers
         notifySettingsChanged()
     }
 }

@@ -14,12 +14,12 @@ class PreferencesViewModel: ObservableObject {
     @Published var preferences: Preferences
 
     init() {
-        // Load from SharedSettings (App Group UserDefaults)
+        // Load from SharedSettings (plist file)
         self.preferences = SharedSettings.shared.loadPreferences()
     }
 
     func save() {
-        // Save to SharedSettings (App Group UserDefaults)
+        // Save to SharedSettings (plist file)
         SharedSettings.shared.savePreferences(preferences)
 
         // Apply launch at login setting

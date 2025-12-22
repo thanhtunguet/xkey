@@ -19,6 +19,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     // Debug logging callback
     var debugLogCallback: ((String) -> Void)?
     
+    /// Enable verbose engine logging (causes lag when enabled!)
+    /// Only turn on for debugging specific issues
+    var verboseEngineLogging: Bool = false
+    
     // Settings
     @Published var inputMethod: InputMethod = .telex {
         didSet { updateEngineSettings() }
@@ -33,6 +37,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     @Published var spellCheckEnabled: Bool = true {
+        didSet { updateEngineSettings() }
+    }
+    
+    @Published var englishDetectionEnabled: Bool = false {
         didSet { updateEngineSettings() }
     }
     
@@ -111,14 +119,16 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         self.engine = VNEngine()
         self.injector = CharacterInjector()
 
-        // Set up engine logging
+        // Set up engine logging (only logs when verboseEngineLogging is enabled)
         self.engine.logCallback = { [weak self] message in
-            self?.debugLogCallback?("🔧 Engine: \(message)")
+            guard let self = self, self.verboseEngineLogging else { return }
+            self.debugLogCallback?("🔧 Engine: \(message)")
         }
         
-        // Set up injector debug logging
+        // Set up injector debug logging (only logs when verboseEngineLogging is enabled)
         self.injector.debugCallback = { [weak self] message in
-            self?.debugLogCallback?("💉 Injector: \(message)")
+            guard let self = self, self.verboseEngineLogging else { return }
+            self.debugLogCallback?("💉 Injector: \(message)")
         }
         
         // Share managers with VNEngine
@@ -130,8 +140,8 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         //     self?.debugLogCallback?("📦 Macro: \(message)")
         // }
         
-        // Load macro data from UserDefaults
-        loadMacrosFromUserDefaults()
+        // Load macro data from plist
+        loadMacrosFromPlist()
         
         // Load smart switch data from file
         loadSmartSwitchData()
@@ -152,7 +162,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     }
     
     @objc private func handleMacrosDidChange() {
-        loadMacrosFromUserDefaults()
+        loadMacrosFromPlist()
         
         // Reset engine to clear buffer when macros change
         // This prevents stale buffer from interfering with new macro matching
@@ -172,13 +182,11 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
     
     // MARK: - Macro Data Loading
     
-    private func loadMacrosFromUserDefaults() {
-        let userDefaultsKey = "XKey.Macros"
-        
+    private func loadMacrosFromPlist() {
         // Clear existing macros first to avoid duplicates
         macroManager.clearAll()
         
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+        if let data = SharedSettings.shared.getMacrosData(),
            let macros = try? JSONDecoder().decode([MacroItemData].self, from: data) {
             for macro in macros {
                 _ = macroManager.addMacro(text: macro.text, content: macro.content)
@@ -534,6 +542,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.codeTable = codeTable
         settings.modernStyle = modernStyle
         settings.spellCheckEnabled = spellCheckEnabled
+        settings.englishDetectionEnabled = englishDetectionEnabled
         settings.fixAutocomplete = fixAutocomplete
         
         // Advanced features
@@ -556,6 +565,9 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.smartSwitchEnabled = smartSwitchEnabled
         
         engine.updateSettings(settings)
+        
+        // Debug: Log spell check setting sync
+        debugLogCallback?("⚙️ Settings sync: spellCheckEnabled=\(spellCheckEnabled) → vCheckSpelling=\(engine.vCheckSpelling), englishDetectionEnabled=\(englishDetectionEnabled) → vEnglishDetection=\(engine.vEnglishDetection)")
         
         // Update macro manager
         macroManager.setCodeTable(codeTable.rawValue)

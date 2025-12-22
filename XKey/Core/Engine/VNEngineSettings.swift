@@ -16,6 +16,7 @@ extension VNEngine {
         var codeTable: CodeTable = .unicode
         var modernStyle: Bool = true
         var spellCheckEnabled: Bool = true
+        var englishDetectionEnabled: Bool = false  // Experimental: Skip Vietnamese processing for English words
         var fixAutocomplete: Bool = true
         var freeMarking: Bool = false
         
@@ -58,6 +59,8 @@ extension VNEngine {
         // Basic settings
         vUseModernOrthography = settings.modernStyle ? 1 : 0
         vCheckSpelling = settings.spellCheckEnabled ? 1 : 0
+        useSpellCheckingBefore = settings.spellCheckEnabled  // Sync internal state to prevent restoration to old value
+        vEnglishDetection = settings.englishDetectionEnabled ? 1 : 0
         vFixRecommendBrowser = settings.fixAutocomplete ? 1 : 0
         
         // Advanced features
@@ -104,6 +107,7 @@ extension VNEngine {
         // Basic settings
         settings.modernStyle = vUseModernOrthography == 1
         settings.spellCheckEnabled = vCheckSpelling == 1
+        settings.englishDetectionEnabled = vEnglishDetection == 1
         settings.fixAutocomplete = vFixRecommendBrowser == 1
         
         // Advanced features

@@ -28,8 +28,6 @@ struct MacroItem: Identifiable, Codable {
 class MacroManagementViewModel: ObservableObject {
     @Published var macros: [MacroItem] = []
     
-    private let userDefaultsKey = "XKey.Macros"
-    
     // Get app delegate
     private func getAppDelegate() -> AppDelegate? {
         if Thread.isMainThread {
@@ -56,8 +54,8 @@ class MacroManagementViewModel: ObservableObject {
     // MARK: - Load/Save
     
     func loadMacros() {
-        // Load from UserDefaults
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+        // Load from plist storage
+        if let data = SharedSettings.shared.getMacrosData(),
            let decoded = try? JSONDecoder().decode([MacroItem].self, from: data) {
             macros = decoded
             
@@ -72,7 +70,7 @@ class MacroManagementViewModel: ObservableObject {
     
     private func saveMacros() {
         if let encoded = try? JSONEncoder().encode(macros) {
-            UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
+            SharedSettings.shared.setMacrosData(encoded)
         }
     }
     
@@ -91,7 +89,7 @@ class MacroManagementViewModel: ObservableObject {
         macros.append(macro)
         macros.sort { $0.text < $1.text }
         
-        // Save to UserDefaults first
+        // Save to plist first
         saveMacros()
         
         // Always post notification to ensure engine reloads macros
@@ -105,7 +103,7 @@ class MacroManagementViewModel: ObservableObject {
         log("🗑️ deleteMacro called: '\(macro.text)'")
         macros.removeAll { $0.id == macro.id }
         
-        // Save to UserDefaults first
+        // Save to plist first
         saveMacros()
         
         // Always post notification to ensure engine reloads macros
@@ -117,7 +115,7 @@ class MacroManagementViewModel: ObservableObject {
         log("🗑️ clearAll called")
         macros.removeAll()
         
-        // Save to UserDefaults first
+        // Save to plist first
         saveMacros()
         
         // Always post notification to ensure engine reloads macros

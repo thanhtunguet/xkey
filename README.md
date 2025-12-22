@@ -5,7 +5,7 @@
   
   **Bộ gõ tiếng Việt hiện đại cho macOS**
   
-  [![Version](https://img.shields.io/badge/version-1.2.9-blue.svg)](https://github.com/xmannv/xkey/releases)
+  [![Version](https://img.shields.io/badge/version-1.2.10-blue.svg)](https://github.com/xmannv/xkey/releases)
   [![macOS](https://img.shields.io/badge/macOS-12.0+-green.svg)](https://www.apple.com/macos/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 </div>
@@ -96,9 +96,9 @@ Tự động thay thế văn bản với Macro:
 - **Tạm tắt thông minh**: Ctrl tắt chính tả, Option tắt bộ gõ
 - **Debug Window**: Theo dõi real-time hoạt động của bộ gõ
 
-### 8. Window Title Rules
+### 8. Hiệu chỉnh XKey Engine xử lý theo ứng dụng
 
-Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, giải quyết vấn đề gõ tiếng Việt trong các web apps:
+Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, giải quyết vấn đề gõ tiếng Việt trong các web apps khác nhau:
 
 | Web App | Xử lý đặc biệt |
 |---------|----------------|
@@ -110,11 +110,11 @@ Phát hiện ngữ cảnh đặc biệt dựa trên tiêu đề cửa sổ, gi�
 - ✅ Áp dụng xử lý phù hợp cho từng context
 - ✅ Có thể tùy chỉnh rules theo nhu cầu
 
-**Cấu hình:** Settings → Nâng cao → Quy tắc theo Window Title
+**Cấu hình:** Settings → Nâng cao → Hiệu chỉnh XKey Engine xử lý theo ứng dụng
 
 #### Hướng dẫn thêm quy tắc mới
 
-1. Mở **Settings** → **Nâng cao** → **Quy tắc theo Window Title**
+1. Mở **Settings** → **Nâng cao** → **Hiệu chỉnh XKey Engine xử lý theo ứng dụng**
 2. Nhấn **"Thêm quy tắc"**
 3. Điền thông tin:
    - **Tên**: Tên hiển thị cho quy tắc (VD: "Safari Google Docs" hoặc "Safari Google Tài liệu")

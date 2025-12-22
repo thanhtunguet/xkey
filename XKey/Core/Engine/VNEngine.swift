@@ -55,6 +55,7 @@ class VNEngine {
     var vQuickStartConsonant = 0   // 0: No, 1: Yes (f->ph, j->gi, w->qu)
     var vQuickEndConsonant = 0     // 0: No, 1: Yes (g->ng, h->nh, k->ch)
     var vTempOffOpenKey = 0        // 0: No, 1: Yes (temp off engine with Option key)
+    var vEnglishDetection = 0      // 0: No, 1: Yes (experimental: skip Vietnamese for detected English words)
     
     // MARK: - Internal State (from Engine.cpp)
     // Note: Using internal access for extension support
@@ -1370,11 +1371,31 @@ class VNEngine {
     private var spellingEndIndex: UInt8 = 0
     
     func checkSpelling(forceCheckVowel: Bool = false) {
+        // Defensive check: Respect vCheckSpelling setting
+        // Even though callers should check this, we add it here as a safety measure
+        // to prevent unnecessary execution when spell check is disabled
+        guard vCheckSpelling == 1 else {
+            // When spell check is disabled, don't modify spelling state
+            // Just ensure tempDisableKey stays false to allow free typing
+            return
+        }
+        
         spellingOK = false
         spellingVowelOK = true
         spellingEndIndex = index
         
         logCallback?("checkSpelling: index=\(index), word=\(getCurrentWord()), vAllowConsonantZFWJ=\(vAllowConsonantZFWJ)")
+        
+        // Early exit optimization: Skip Vietnamese spell check for definitely English words
+        // This is an EXPERIMENTAL feature that must be explicitly enabled via vEnglishDetection
+        // When enabled, it improves performance and reduces false positives for English words
+        if vEnglishDetection == 1 && index >= 3 && isCurrentWordDefinitelyEnglish() {
+            logCallback?("  → Detected English word, skipping Vietnamese spell check")
+            spellingOK = false
+            spellingVowelOK = false
+            tempDisableKey = true
+            return
+        }
         
         if index > 0 && chr(Int(index) - 1) == VietnameseData.KEY_RIGHT_BRACKET {
             spellingEndIndex = index - 1
@@ -2171,7 +2192,9 @@ class VNEngine {
         } else if vietnameseData.charKeyCode.contains(UInt16(lastState[0] & VNEngine.CHAR_MASK)) {
             index = 0
             specialChar = lastState
-            checkSpelling()
+            if vCheckSpelling == 1 {
+                checkSpelling()
+            }
             logCallback?("  → Restored special char: count=\(specialChar.count)")
         } else {
             for i in 0..<lastState.count {

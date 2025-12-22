@@ -8,7 +8,7 @@
 import Cocoa
 import SwiftUI
 
-class DebugWindowController: NSWindowController {
+class DebugWindowController: NSWindowController, DebugWindowControllerProtocol {
     
     private let viewModel: DebugViewModel
     
@@ -58,6 +58,10 @@ class DebugWindowController: NSWindowController {
     
     func setupReadWordCallback(_ callback: @escaping () -> Void) {
         viewModel.readWordCallback = callback
+    }
+    
+    func setupVerboseLoggingCallback(_ callback: @escaping (Bool) -> Void) {
+        viewModel.verboseLoggingCallback = callback
     }
     
     func updateStatus(_ status: String) {

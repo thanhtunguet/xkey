@@ -153,14 +153,14 @@ class InputSourceManager {
         return config.isXKeyEnabled(for: inputSourceID)
     }
 
-    /// Save configuration to UserDefaults
+    /// Save configuration to plist (via SharedSettings)
     private func saveConfig() {
         if let data = try? JSONEncoder().encode(config) {
             SharedSettings.shared.setInputSourceConfig(data)
         }
     }
 
-    /// Load configuration from UserDefaults
+    /// Load configuration from plist (via SharedSettings)
     private static func loadConfig() -> InputSourceConfig {
         guard let data = SharedSettings.shared.getInputSourceConfig(),
               let config = try? JSONDecoder().decode(InputSourceConfig.self, from: data) else {

@@ -9,12 +9,8 @@
 import Cocoa
 import InputMethodKit
 
-// MARK: - Notification Names (shared with XKey app)
 
-extension Notification.Name {
-    /// Posted when settings change (distributed, cross-app)
-    static let xkeySettingsDidChange = Notification.Name("XKey.settingsDidChange")
-}
+// Note: Notification.Name.xkeySettingsDidChange is defined in SharedSettings.swift
 
 // MARK: - App Delegate
 

@@ -92,6 +92,7 @@ class XKeyIMController: IMKInputController {
         engineSettings.codeTable = settings.codeTable
         engineSettings.modernStyle = settings.modernStyle
         engineSettings.spellCheckEnabled = settings.spellCheckEnabled
+        engineSettings.englishDetectionEnabled = settings.englishDetectionEnabled
         engineSettings.quickTelexEnabled = settings.quickTelexEnabled
         engineSettings.freeMarking = settings.freeMarkEnabled
         engineSettings.restoreIfWrongSpelling = settings.restoreIfWrongSpelling
@@ -761,112 +762,100 @@ class XKeyIMController: IMKInputController {
 // MARK: - Settings Helper
 
 /// Settings wrapper for XKeyIM
+/// ARCHITECTURE: Uses plist file directly for reliable sync with XKey app
 class XKeyIMSettings {
     
-    private let defaults: UserDefaults?
+    /// App Group identifier
+    private let appGroup = "group.com.codetay.inputmethod.XKey"
+    
+    /// Cache of plist URL
+    private lazy var plistURL: URL? = {
+        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+            IMKitDebugger.shared.log("Cannot get App Group container URL", category: "SETTINGS")
+            return nil
+        }
+        return containerURL.appendingPathComponent("Library/Preferences/\(appGroup).plist")
+    }()
+    
+    // MARK: - Settings Properties
     
     var inputMethod: InputMethod = .telex
     var codeTable: CodeTable = .unicode
     var modernStyle: Bool = true
     var spellCheckEnabled: Bool = true
+    var englishDetectionEnabled: Bool = false  // Experimental: Skip Vietnamese processing for English words
     var quickTelexEnabled: Bool = true
     var freeMarkEnabled: Bool = false
     var restoreIfWrongSpelling: Bool = true
     var useMarkedText: Bool = true  // Default to true - standard IMKit behavior
     
     init() {
-        // Try App Group first - must match the App Group in entitlements
-        defaults = UserDefaults(suiteName: "group.com.codetay.inputmethod.XKey")
         reload()
     }
     
     func reload() {
-        guard let defaults = defaults else {
-            IMKitDebugger.shared.log("reload() - defaults is nil! App Group may not be configured", category: "SETTINGS")
-            return
-        }
-
-        // Force synchronize to get latest values from disk
-        defaults.synchronize()
-
-        // CRITICAL: Read inputMethod directly from plist to bypass cfprefsd cache
-        // Similar to useMarkedText logic - try plist first, then UserDefaults, then default
-        let inputMethodFromPlist = readIntFromPlist(key: "XKey.inputMethod")
-        let inputMethodValue = inputMethodFromPlist ?? defaults.integer(forKey: "XKey.inputMethod")
-
-        if let method = InputMethod(rawValue: inputMethodValue) {
-            let oldMethod = inputMethod
-
-            // Only log if value ACTUALLY changed (not just reload with same value)
-            if oldMethod != method {
-                inputMethod = method
-                let source = inputMethodFromPlist != nil ? "plist file" : "UserDefaults"
-                IMKitDebugger.shared.log("reload() - inputMethod CHANGED: \(oldMethod.displayName) → \(method.displayName) (rawValue: \(inputMethodValue), from \(source))", category: "SETTINGS")
-            } else {
-                // Value unchanged - still update in case of initialization
-                inputMethod = method
+        // Read all settings from plist file
+        
+        // Input Method
+        let oldInputMethod = inputMethod
+        if let method = InputMethod(rawValue: readInt(forKey: "XKey.inputMethod")) {
+            inputMethod = method
+            if oldInputMethod != method {
+                IMKitDebugger.shared.log("reload() - inputMethod CHANGED: \(oldInputMethod.displayName) → \(method.displayName)", category: "SETTINGS")
             }
-        } else {
-            // Keep the initialized default value
-            IMKitDebugger.shared.log("reload() - inputMethod not found, using default: \(inputMethod.displayName)", category: "SETTINGS")
         }
-
-        if let table = CodeTable(rawValue: defaults.integer(forKey: "XKey.codeTable")) {
+        
+        // Code Table
+        if let table = CodeTable(rawValue: readInt(forKey: "XKey.codeTable")) {
             codeTable = table
         }
-
-        modernStyle = defaults.bool(forKey: "XKey.modernStyle")
-        spellCheckEnabled = defaults.bool(forKey: "XKey.spellCheckEnabled")
-        quickTelexEnabled = defaults.bool(forKey: "XKey.quickTelexEnabled")
-        freeMarkEnabled = defaults.bool(forKey: "XKey.freeMarkEnabled")
-        restoreIfWrongSpelling = defaults.bool(forKey: "XKey.restoreIfWrongSpelling")
-
-        // CRITICAL: Read imkitUseMarkedText directly from plist file to bypass cfprefsd cache
-        // cfprefsd caches aggressively and may not reflect the latest value from XKey app
+        
+        // Boolean settings
+        modernStyle = readBool(forKey: "XKey.modernStyle")
+        spellCheckEnabled = readBool(forKey: "XKey.spellCheckEnabled")
+        englishDetectionEnabled = readBool(forKey: "XKey.englishDetectionEnabled")
+        quickTelexEnabled = readBool(forKey: "XKey.quickTelexEnabled", defaultValue: true)
+        freeMarkEnabled = readBool(forKey: "XKey.freeMarkEnabled")
+        restoreIfWrongSpelling = readBool(forKey: "XKey.restoreIfWrongSpelling", defaultValue: true)
+        
+        // Use Marked Text
         let oldUseMarkedText = useMarkedText
-        useMarkedText = readMarkedTextFromPlist() ?? true
-
-        // Only log if value changed
+        useMarkedText = readBool(forKey: "XKey.imkitUseMarkedText", defaultValue: true)
         if oldUseMarkedText != useMarkedText {
-            IMKitDebugger.shared.log("reload() - useMarkedText CHANGED: \(oldUseMarkedText) → \(useMarkedText) (from plist file)", category: "SETTINGS")
+            IMKitDebugger.shared.log("reload() - useMarkedText CHANGED: \(oldUseMarkedText) → \(useMarkedText)", category: "SETTINGS")
         }
     }
     
-    /// Read integer value directly from plist file to bypass cfprefsd cache
-    private func readIntFromPlist(key: String) -> Int? {
-        guard let dict = readPlistDict() else { return nil }
-        return dict[key] as? Int
-    }
-
-    /// Read imkitUseMarkedText directly from plist file to bypass cfprefsd cache
-    private func readMarkedTextFromPlist() -> Bool? {
-        guard let dict = readPlistDict() else { return nil }
-
-        if let value = dict["XKey.imkitUseMarkedText"] as? Bool {
-            return value
-        } else if let value = dict["XKey.imkitUseMarkedText"] as? Int {
-            return value != 0
-        }
-
-        return nil
-    }
-
-    /// Read plist dictionary directly from file to bypass cfprefsd cache
+    // MARK: - Plist Read Helpers
+    
+    /// Read the entire plist dictionary
     private func readPlistDict() -> [String: Any]? {
-        let appGroup = "group.com.codetay.inputmethod.XKey"
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
-            IMKitDebugger.shared.log("readPlistDict() - Cannot get App Group container URL", category: "SETTINGS")
-            return nil
-        }
-
-        let prefsURL = containerURL.appendingPathComponent("Library/Preferences/\(appGroup).plist")
-
-        guard let data = try? Data(contentsOf: prefsURL),
+        guard let url = plistURL,
+              let data = try? Data(contentsOf: url),
               let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
-            IMKitDebugger.shared.log("readPlistDict() - Cannot read plist file at \(prefsURL.path)", category: "SETTINGS")
             return nil
         }
-
         return dict
+    }
+    
+    /// Read an Int value from plist
+    private func readInt(forKey key: String) -> Int {
+        if let dict = readPlistDict(), let value = dict[key] as? Int {
+            return value
+        }
+        return 0
+    }
+    
+    /// Read a Bool value from plist
+    private func readBool(forKey key: String, defaultValue: Bool = false) -> Bool {
+        if let dict = readPlistDict() {
+            if let value = dict[key] as? Bool {
+                return value
+            }
+            if let value = dict[key] as? Int {
+                return value != 0
+            }
+        }
+        return defaultValue
     }
 }

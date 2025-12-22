@@ -7,6 +7,42 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - Rules Document for FileExporter
+
+struct RulesDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+    
+    var rules: [WindowTitleRule]
+    
+    init(rules: [WindowTitleRule]) {
+        self.rules = rules
+    }
+    
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        rules = try JSONDecoder().decode([WindowTitleRule].self, from: data)
+    }
+    
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(rules)
+        return .init(regularFileWithContents: data)
+    }
+}
+
+// MARK: - Pre-fill Info for Quick Add
+
+struct DetectedAppInfo: Identifiable {
+    let id = UUID()
+    var appName: String
+    var bundleId: String
+    var windowTitle: String
+}
 
 // MARK: - Window Title Rules View
 
@@ -15,34 +51,64 @@ struct WindowTitleRulesView: View {
     @StateObject private var viewModel = WindowTitleRulesViewModel()
     @State private var showAddRule = false
     @State private var editingRule: WindowTitleRule?
+    @State private var quickAddInfo: DetectedAppInfo?
     @State private var showBuiltInRules = false
+    
+    // Import/Export states
+    @State private var showImportSheet = false
+    @State private var showExportSheet = false
+    @State private var exportDocument: RulesDocument?
+    @State private var showImportAlert = false
+    @State private var importAlertMessage = ""
+    @State private var importAlertIsError = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Quy tắc theo Window Title")
-                        .font(.headline)
-                    Text("Cho phép xử lý đặc biệt dựa trên tiêu đề cửa sổ (ví dụ: Google Docs trong Safari)")
+                    Text("Cho phép hiệu chỉnh XKey Engine xử lý Tiếng Việt theo từng ứng dụng cụ thể (ví dụ: Google Docs trong Safari)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 
                 Spacer()
                 
-                Button(action: { showAddRule = true }) {
-                    Label("Thêm quy tắc", systemImage: "plus")
+                // Import/Export buttons
+                HStack(spacing: 8) {
+                    Button(action: { showImportSheet = true }) {
+                        Label("Import", systemImage: "square.and.arrow.down")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    
+                    Button(action: { prepareExport() }) {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(viewModel.customRules.isEmpty)
+                    
+                    Button(action: { showAddRule = true }) {
+                        Label("Thêm quy tắc", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
             }
             
             Divider()
             
             // Current detection info
             if viewModel.isDetectionAvailable {
-                CurrentDetectionInfoView(viewModel: viewModel)
+                CurrentDetectionInfoView(viewModel: viewModel) {
+                    // Quick add callback - pre-fill detected info
+                    quickAddInfo = DetectedAppInfo(
+                        appName: viewModel.currentAppName,
+                        bundleId: viewModel.currentBundleId,
+                        windowTitle: viewModel.currentWindowTitle
+                    )
+                }
             }
             
             // Custom Rules
@@ -82,7 +148,9 @@ struct WindowTitleRulesView: View {
                 content: {
                     LazyVStack(spacing: 8) {
                         ForEach(viewModel.builtInRules) { rule in
-                            RuleRowView(rule: rule, isBuiltIn: true, onEdit: nil, onDelete: nil, onToggle: nil)
+                            RuleRowView(rule: rule, isBuiltIn: true, onEdit: nil, onDelete: nil) { enabled in
+                                viewModel.toggleBuiltInRule(rule, enabled: enabled)
+                            }
                         }
                     }
                     .padding(.top, 8)
@@ -95,13 +163,148 @@ struct WindowTitleRulesView: View {
             .padding(.vertical, 4)
         }
         .sheet(isPresented: $showAddRule) {
-            AddRuleSheet(viewModel: viewModel, existingRule: nil)
+            AddRuleSheet(viewModel: viewModel, existingRule: nil, prefillInfo: nil)
         }
         .sheet(item: $editingRule) { rule in
-            AddRuleSheet(viewModel: viewModel, existingRule: rule)
+            AddRuleSheet(viewModel: viewModel, existingRule: rule, prefillInfo: nil)
+        }
+        .sheet(item: $quickAddInfo) { prefill in
+            AddRuleSheet(viewModel: viewModel, existingRule: nil, prefillInfo: prefill)
+        }
+        .fileImporter(
+            isPresented: $showImportSheet,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleImportResult(result)
+        }
+        .fileExporter(
+            isPresented: $showExportSheet,
+            document: exportDocument,
+            contentType: .json,
+            defaultFilename: "xkey_window_rules.json"
+        ) { result in
+            handleExportResult(result)
+        }
+        .alert(importAlertIsError ? "Lỗi" : "Thành công", isPresented: $showImportAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(importAlertMessage)
         }
         .onAppear {
             viewModel.refresh()
+        }
+    }
+    
+    // MARK: - Import/Export Methods
+    
+    private func prepareExport() {
+        let rules = viewModel.customRules
+        guard !rules.isEmpty else { return }
+        
+        exportDocument = RulesDocument(rules: rules)
+        showExportSheet = true
+    }
+    
+    private func handleExportResult(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(_):
+            importAlertMessage = "Đã xuất \(viewModel.customRules.count) quy tắc thành công"
+            importAlertIsError = false
+            showImportAlert = true
+        case .failure(let error):
+            // User cancelled - don't show error
+            if (error as NSError).code == NSUserCancelledError {
+                return
+            }
+            importAlertMessage = "Lỗi khi lưu file: \(error.localizedDescription)"
+            importAlertIsError = true
+            showImportAlert = true
+        }
+        exportDocument = nil
+    }
+    
+    private func handleImportResult(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            importRules(from: url)
+        case .failure(let error):
+            importAlertMessage = "Lỗi khi chọn file: \(error.localizedDescription)"
+            importAlertIsError = true
+            showImportAlert = true
+        }
+    }
+    
+    private func importRules(from url: URL) {
+        do {
+            // Start accessing security-scoped resource
+            guard url.startAccessingSecurityScopedResource() else {
+                importAlertMessage = "Không có quyền truy cập file"
+                importAlertIsError = true
+                showImportAlert = true
+                return
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+            
+            let data = try Data(contentsOf: url)
+            let decoder = JSONDecoder()
+            let importedRules = try decoder.decode([WindowTitleRule].self, from: data)
+            
+            guard !importedRules.isEmpty else {
+                importAlertMessage = "File không chứa quy tắc nào"
+                importAlertIsError = true
+                showImportAlert = true
+                return
+            }
+            
+            // Add imported rules (with new UUIDs to avoid conflicts)
+            var importedCount = 0
+            for rule in importedRules {
+                // Create new rule with fresh UUID
+                let newRule = WindowTitleRule(
+                    name: rule.name,
+                    bundleIdPattern: rule.bundleIdPattern,
+                    titlePattern: rule.titlePattern,
+                    matchMode: rule.matchMode,
+                    isEnabled: rule.isEnabled,
+                    useMarkedText: rule.useMarkedText,
+                    hasMarkedTextIssues: rule.hasMarkedTextIssues,
+                    commitDelay: rule.commitDelay,
+                    injectionMethod: rule.injectionMethod,
+                    injectionDelays: rule.injectionDelays,
+                    textSendingMethod: rule.textSendingMethod,
+                    description: rule.description
+                )
+                viewModel.addRule(newRule)
+                importedCount += 1
+            }
+            
+            importAlertMessage = "Đã import \(importedCount) quy tắc thành công"
+            importAlertIsError = false
+            showImportAlert = true
+            
+        } catch let decodingError as DecodingError {
+            var errorDetail = "Lỗi định dạng JSON"
+            switch decodingError {
+            case .keyNotFound(let key, _):
+                errorDetail = "Thiếu trường: \(key.stringValue)"
+            case .typeMismatch(let type, let context):
+                errorDetail = "Sai kiểu dữ liệu cho \(context.codingPath.last?.stringValue ?? "unknown"): cần \(type)"
+            case .valueNotFound(_, let context):
+                errorDetail = "Thiếu giá trị: \(context.codingPath.last?.stringValue ?? "unknown")"
+            case .dataCorrupted(let context):
+                errorDetail = "Dữ liệu bị lỗi: \(context.debugDescription)"
+            @unknown default:
+                errorDetail = decodingError.localizedDescription
+            }
+            importAlertMessage = errorDetail
+            importAlertIsError = true
+            showImportAlert = true
+        } catch {
+            importAlertMessage = "Lỗi: \(error.localizedDescription)"
+            importAlertIsError = true
+            showImportAlert = true
         }
     }
 }
@@ -111,6 +314,7 @@ struct WindowTitleRulesView: View {
 @available(macOS 13.0, *)
 struct CurrentDetectionInfoView: View {
     @ObservedObject var viewModel: WindowTitleRulesViewModel
+    var onQuickAdd: (() -> Void)?
     
     var body: some View {
         GroupBox(label: Label("Phát hiện hiện tại", systemImage: "eye")) {
@@ -173,11 +377,24 @@ struct CurrentDetectionInfoView: View {
                     }
                 }
                 
-                Button("Làm mới") {
-                    viewModel.refresh()
+                HStack(spacing: 8) {
+                    Button("Làm mới") {
+                        viewModel.refresh()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                    
+                    if let onQuickAdd = onQuickAdd, !viewModel.currentBundleId.isEmpty {
+                        Button {
+                            onQuickAdd()
+                        } label: {
+                            Label("Thêm nhanh", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.mini)
+                        .help("Tạo quy tắc mới với thông tin đã phát hiện")
+                    }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
                 .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -259,7 +476,19 @@ struct RuleRowView: View {
                 }
             }
             
-            // Actions (only for custom rules)
+            // Toggle for both built-in and custom rules
+            if let onToggle = onToggle {
+                Toggle("", isOn: Binding(
+                    get: { rule.isEnabled },
+                    set: { onToggle($0) }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .help(rule.isEnabled ? "Tắt quy tắc này" : "Bật quy tắc này")
+            }
+            
+            // Edit/Delete actions (only for custom rules)
             if !isBuiltIn {
                 HStack(spacing: 8) {
                     if let onEdit = onEdit {
@@ -326,6 +555,7 @@ struct BehaviorBadge: View {
 struct AddRuleSheet: View {
     @ObservedObject var viewModel: WindowTitleRulesViewModel
     let existingRule: WindowTitleRule?
+    let prefillInfo: DetectedAppInfo?
     
     @Environment(\.dismiss) private var dismiss
     
@@ -580,6 +810,11 @@ struct AddRuleSheet: View {
         .onAppear {
             if let rule = existingRule {
                 loadExistingRule(rule)
+            } else if let prefill = prefillInfo {
+                // Pre-fill from detected app info
+                name = prefill.appName
+                bundleIdPattern = prefill.bundleId
+                titlePattern = prefill.windowTitle
             }
         }
         .sheet(isPresented: $showAppPicker) {
@@ -814,6 +1049,11 @@ class WindowTitleRulesViewModel: ObservableObject {
         var updatedRule = rule
         updatedRule.isEnabled = enabled
         AppBehaviorDetector.shared.updateCustomRule(updatedRule)
+        refresh()
+    }
+    
+    func toggleBuiltInRule(_ rule: WindowTitleRule, enabled: Bool) {
+        AppBehaviorDetector.shared.toggleBuiltInRule(rule.name, enabled: enabled)
         refresh()
     }
 }
