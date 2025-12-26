@@ -100,6 +100,27 @@ struct AdvancedSection: View {
                                 // Dictionary status
                                 dictionaryStatusView
                                 
+                                // Success/Error messages (for both download and reload)
+                                if let error = downloadError {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .foregroundColor(.orange)
+                                        Text(error)
+                                            .font(.caption)
+                                            .foregroundColor(.orange)
+                                    }
+                                }
+
+                                if showDownloadSuccess {
+                                    HStack {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("Tải từ điển thành công!")
+                                            .font(.caption)
+                                            .foregroundColor(.green)
+                                    }
+                                }
+                                
                                 // Download section (only when not loaded)
                                 if !isDictionaryLoaded {
                                     downloadSection
@@ -315,6 +336,23 @@ struct AdvancedSection: View {
             if isDictionaryLoaded {
                 Text("Đã tải từ điển (\(wordCount) từ)")
                     .font(.caption)
+                
+                // Reload button for updating dictionary
+                Button(action: reloadDictionary) {
+                    HStack(spacing: 4) {
+                        if isDownloading {
+                            ProgressView()
+                                .controlSize(.small)
+                                .scaleEffect(0.6)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text(isDownloading ? "Đang tải..." : "Tải lại")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(isDownloading)
             } else if isDictionaryAvailable {
                 Text("Từ điển đã tải về nhưng chưa được nạp")
                     .font(.caption)
@@ -336,26 +374,6 @@ struct AdvancedSection: View {
     
     private var downloadSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let error = downloadError {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                }
-            }
-
-            if showDownloadSuccess {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Tải từ điển thành công!")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                }
-            }
-
             // Download button
             HStack(spacing: 8) {
                 Button(action: downloadDictionary) {
@@ -585,6 +603,31 @@ struct AdvancedSection: View {
                     }
                 case .failure(let error):
                     downloadError = error.localizedDescription
+                }
+            }
+        }
+    }
+    
+    private func reloadDictionary() {
+        isDownloading = true
+        downloadError = nil
+        showDownloadSuccess = false
+
+        let style: VNDictionaryManager.DictionaryStyle = viewModel.preferences.modernStyle ? .dauMoi : .dauCu
+
+        VNDictionaryManager.shared.downloadAndLoad(style: style) { result in
+            DispatchQueue.main.async {
+                isDownloading = false
+
+                switch result {
+                case .success:
+                    showDownloadSuccess = true
+                    // Hide success message after 3 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        showDownloadSuccess = false
+                    }
+                case .failure(let error):
+                    downloadError = "Lỗi khi tải lại: \(error.localizedDescription)"
                 }
             }
         }

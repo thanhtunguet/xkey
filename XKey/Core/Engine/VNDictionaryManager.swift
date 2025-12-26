@@ -7,8 +7,8 @@ class VNDictionaryManager {
 
     // Dictionary URLs from hunspell-vi repository
     private let dictionaryURLs = [
-        "DauMoi": "https://raw.githubusercontent.com/1ec5/hunspell-vi/master/dictionaries/vi-DauMoi.dic",
-        "DauCu": "https://raw.githubusercontent.com/1ec5/hunspell-vi/master/dictionaries/vi-DauCu.dic"
+        "DauMoi": "https://raw.githubusercontent.com/xmannv/hunspell-vi/master/dictionaries/vi-DauMoi.dic",
+        "DauCu": "https://raw.githubusercontent.com/xmannv/hunspell-vi/master/dictionaries/vi-DauCu.dic"
     ]
 
     // In-memory dictionary cache
