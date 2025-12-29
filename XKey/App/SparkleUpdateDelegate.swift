@@ -13,12 +13,24 @@ import AppKit
 /// Primary purpose: 
 /// 1. Force save settings to plist before app restarts for update
 /// 2. Bring update dialog to front for menu bar apps
+/// 3. Auto-update XKeyIM after XKey app update completes
 class SparkleUpdateDelegate: NSObject, SPUUpdaterDelegate, SPUStandardUserDriverDelegate {
     
     // MARK: - Debug Logging Callback
     
     /// Callback for logging debug messages
     var debugLogCallback: ((String) -> Void)?
+    
+    // MARK: - Initialization
+    
+    override init() {
+        super.init()
+        
+        // Connect XKeyIMUpdateManager debug logging
+        XKeyIMUpdateManager.shared.debugLogCallback = { [weak self] message in
+            self?.logDebug(message)
+        }
+    }
     
     // MARK: - SPUStandardUserDriverDelegate
     

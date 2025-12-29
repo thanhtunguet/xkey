@@ -119,6 +119,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup Sparkle auto-update
         setupSparkleUpdater()
 
+        // Check and update XKeyIM if needed (on app startup)
+        checkXKeyIMUpdate()
+
         // Load Vietnamese dictionary if spell checking is enabled
         setupSpellCheckDictionary()
 
@@ -1066,6 +1069,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
         } catch {
             debugWindowController?.logEvent("❌ Failed to initialize Sparkle: \(error)")
+        }
+    }
+
+    // MARK: - XKeyIM Auto-Update
+
+    private func checkXKeyIMUpdate() {
+        // Connect XKeyIMUpdateManager debug logging
+        XKeyIMUpdateManager.shared.debugLogCallback = { [weak self] message in
+            self?.debugWindowController?.logEvent(message)
+        }
+        
+        // Always install bundled XKeyIM after a short delay
+        // This ensures XKeyIM is always in sync with XKey app
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            XKeyIMUpdateManager.shared.installBundledXKeyIM(showNotification: false)
         }
     }
 
