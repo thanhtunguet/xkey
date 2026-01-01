@@ -117,8 +117,12 @@ class CharacterInjector {
                 injectViaSelectionInternal(count: backspaceCount, delays: delays, proxy: proxy)
 
             case .autocomplete:
-                debugCallback?("    → Autocomplete method: Forward Delete + backspaces")
-                injectViaAutocompleteInternal(count: backspaceCount, delays: delays, proxy: proxy)
+                // For autocomplete method, Forward Delete is ALWAYS needed to clear browser autosuggestions
+                // However, we must skip it when typing mid-sentence or when AX detects text after cursor
+                // Note: We use shouldSendForwardDeleteForAutocomplete() which ignores fixAutocomplete setting
+                let shouldForwardDelete = shouldSendForwardDeleteForAutocomplete()
+                debugCallback?("    → Autocomplete method: Forward Delete + backspaces (skipFwdDel=\(!shouldForwardDelete))")
+                injectViaAutocompleteInternal(count: backspaceCount, delays: delays, proxy: proxy, skipForwardDelete: !shouldForwardDelete)
 
             case .slow, .fast:
                 debugCallback?("    → Backspace method: delays=\(delays), directPost=\(useDirectPost)")
@@ -192,9 +196,14 @@ class CharacterInjector {
     }
     
     /// Internal: Autocomplete injection (no semaphore)
-    private func injectViaAutocompleteInternal(count: Int, delays: InjectionDelays, proxy: CGEventTapProxy) {
-        sendForwardDelete(proxy: proxy)
-        usleep(3000)
+    /// - Parameter skipForwardDelete: if true, skip sending Forward Delete (e.g., when typing mid-sentence)
+    private func injectViaAutocompleteInternal(count: Int, delays: InjectionDelays, proxy: CGEventTapProxy, skipForwardDelete: Bool = false) {
+        if !skipForwardDelete {
+            sendForwardDelete(proxy: proxy)
+            usleep(3000)
+        } else {
+            debugCallback?("    → Skipped Forward Delete (mid-sentence)")
+        }
         for i in 0..<count {
             sendKeyPress(0x33, proxy: proxy)
             usleep(delays.backspace > 0 ? delays.backspace : 1000)
@@ -376,10 +385,17 @@ class CharacterInjector {
     }
     
     /// Autocomplete injection: Forward Delete to clear suggestion, then backspaces
+    /// Respects isTypingMidSentence flag to avoid deleting text when cursor is in middle
     private func injectViaAutocomplete(count: Int, delays: InjectionDelays, proxy: CGEventTapProxy) {
-        // Forward Delete clears auto-selected suggestion
-        sendForwardDelete(proxy: proxy)
-        usleep(3000)
+        // Only send Forward Delete if not typing mid-sentence
+        // When cursor is at end of text, Forward Delete clears autocomplete suggestion
+        // When cursor is in middle of text, Forward Delete would delete real characters
+        if !isTypingMidSentence {
+            sendForwardDelete(proxy: proxy)
+            usleep(3000)
+        } else {
+            debugCallback?("    → Skipped Forward Delete (mid-sentence)")
+        }
         
         // Backspaces remove typed characters
         for i in 0..<count {
@@ -580,6 +596,36 @@ class CharacterInjector {
         // AX not supported - fallback to allow Forward Delete
         // This handles Spotlight, Raycast, Alfred, etc. that don't support AX
         debugCallback?("  [FwdDel] Allowed: AX not supported (fallback)")
+        return true
+    }
+
+    /// Determine if Forward Delete should be sent for autocomplete method (Firefox/Safari address bar)
+    /// Unlike shouldSendForwardDelete(), this doesn't check fixAutocomplete setting
+    /// because autocomplete method ALWAYS needs Forward Delete to clear browser autosuggestions
+    /// Only skips Forward Delete if:
+    /// 1. Typing mid-sentence (cursor was moved)
+    /// 2. AX API confirms text after cursor
+    private func shouldSendForwardDeleteForAutocomplete() -> Bool {
+        // Don't send if we know cursor was moved (typing mid-sentence)
+        if isTypingMidSentence {
+            debugCallback?("  [FwdDel-AC] Skipped: isTypingMidSentence=true")
+            return false
+        }
+
+        // Check via Accessibility API if there's text after cursor
+        if let hasTextAfter = hasTextAfterCursor() {
+            if hasTextAfter {
+                debugCallback?("  [FwdDel-AC] Skipped: AX detected text after cursor")
+                return false
+            } else {
+                debugCallback?("  [FwdDel-AC] Allowed: AX confirmed no text after cursor")
+                return true
+            }
+        }
+
+        // AX not supported - fallback to allow Forward Delete
+        // Browsers usually support AX, but fallback to allow for edge cases
+        debugCallback?("  [FwdDel-AC] Allowed: AX not supported (fallback)")
         return true
     }
 
