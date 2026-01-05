@@ -310,7 +310,7 @@ class MacroManager {
             }
         }
         
-        logCallback?("⚠️ getCharacterCode: Unknown keyCode=0x\(String(format: "%X", keyCode)) from data=0x\(String(format: "%X", data))")
+        logCallback?("getCharacterCode: Unknown keyCode=0x\(String(format: "%X", keyCode)) from data=0x\(String(format: "%X", data))")
         
         // Fallback - return as is
         return data & 0xFFFF

@@ -46,6 +46,7 @@ enum SharedSettingsKey: String {
     case macroEnabled = "XKey.macroEnabled"
     case macroInEnglishMode = "XKey.macroInEnglishMode"
     case autoCapsMacro = "XKey.autoCapsMacro"
+    case addSpaceAfterMacro = "XKey.addSpaceAfterMacro"
     case macros = "XKey.macros"
 
     // Smart switch settings
@@ -402,6 +403,11 @@ class SharedSettings {
         set { writeBool(newValue, forKey: SharedSettingsKey.autoCapsMacro.rawValue) }
     }
 
+    var addSpaceAfterMacro: Bool {
+        get { readBool(forKey: SharedSettingsKey.addSpaceAfterMacro.rawValue) }
+        set { writeBool(newValue, forKey: SharedSettingsKey.addSpaceAfterMacro.rawValue) }
+    }
+
     func getMacros() -> Data? {
         return readData(forKey: SharedSettingsKey.macros.rawValue)
     }
@@ -745,6 +751,7 @@ class SharedSettings {
         prefs.macroEnabled = macroEnabled
         prefs.macroInEnglishMode = macroInEnglishMode
         prefs.autoCapsMacro = autoCapsMacro
+        prefs.addSpaceAfterMacro = addSpaceAfterMacro
 
         // Smart switch
         prefs.smartSwitchEnabled = smartSwitchEnabled
@@ -825,6 +832,7 @@ class SharedSettings {
         macroEnabled = prefs.macroEnabled
         macroInEnglishMode = prefs.macroInEnglishMode
         autoCapsMacro = prefs.autoCapsMacro
+        addSpaceAfterMacro = prefs.addSpaceAfterMacro
 
         // Smart switch
         smartSwitchEnabled = prefs.smartSwitchEnabled

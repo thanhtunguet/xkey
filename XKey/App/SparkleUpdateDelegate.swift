@@ -65,7 +65,7 @@ class SparkleUpdateDelegate: NSObject, SPUUpdaterDelegate, SPUStandardUserDriver
     /// Called immediately before installing the specified update
     /// We use this as an early trigger to ensure settings are saved
     func updater(_ updater: SPUUpdater, willInstallUpdate item: SUAppcastItem) {
-        logDebug("🔄 Sparkle: Will install update v\(item.displayVersionString)")
+        logDebug("Sparkle: Will install update v\(item.displayVersionString)")
         
         // Force save settings before update is installed
         forceWriteAllSettings()
@@ -74,18 +74,18 @@ class SparkleUpdateDelegate: NSObject, SPUUpdaterDelegate, SPUStandardUserDriver
     /// Called immediately before the application relaunches
     /// This is our last chance to save settings before restart
     func updaterWillRelaunchApplication(_ updater: SPUUpdater) {
-        logDebug("🔄 Sparkle: Will relaunch application - force saving settings...")
+        logDebug("Sparkle: Will relaunch application - force saving settings...")
         
         // Force save settings one more time before restart
         forceWriteAllSettings()
         
-        logDebug("✅ Sparkle: Settings saved, ready to relaunch")
+        logDebug("Sparkle: Settings saved, ready to relaunch")
     }
     
     /// Returns whether the relaunch should be delayed to perform other tasks
     /// We don't need to delay, but we use this as another opportunity to save
     func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem, untilInvokingBlock installHandler: @escaping () -> Void) -> Bool {
-        logDebug("🔄 Sparkle: Preparing for relaunch after update to v\(item.displayVersionString)")
+        logDebug("Sparkle: Preparing for relaunch after update to v\(item.displayVersionString)")
         
         // Save settings before proceeding
         forceWriteAllSettings()
@@ -106,7 +106,7 @@ class SparkleUpdateDelegate: NSObject, SPUUpdaterDelegate, SPUStandardUserDriver
         // This ensures the plist file is up-to-date with the current App Group container
         SharedSettings.shared.forceWriteCurrentSettings()
         
-        logDebug("✅ Settings written to plist successfully")
+        logDebug("Settings written to plist successfully")
     }
     
     // MARK: - Debug Logging

@@ -79,7 +79,7 @@ class OverlayAppDetector {
                        let width = bounds["Width"],
                        let height = bounds["Height"],
                        width > 0 && height > 0 {
-                        logDebug("✅ FOUND overlay app: '\(owner)' (size: \(Int(width))×\(Int(height)))")
+                        logDebug("FOUND overlay app: '\(owner)' (size: \(Int(width))×\(Int(height)))")
                         return true
                     }
                 }

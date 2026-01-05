@@ -39,7 +39,7 @@ extension VNEngine {
 
         // Debug: Show macro key being searched
         let macroKeyStr = hookState.macroKey.map { String(format: "0x%X", $0) }.joined(separator: ", ")
-        logCallback?("🔍 findAndReplaceMacro: searching for macroKey=[\(macroKeyStr)] (count=\(hookState.macroKey.count))")
+        logCallback?("findAndReplaceMacro: searching for macroKey=[\(macroKeyStr)] (count=\(hookState.macroKey.count))")
 
         // Try to find macro
         if let macroContent = macroManager.findMacro(key: hookState.macroKey) {
@@ -54,7 +54,7 @@ extension VNEngine {
             // Note: We don't set newCharCount or charData for macros
             // because we use macroData directly to support unlimited length
 
-            logCallback?("✅ Macro found! Will delete \(hookState.backspaceCount) chars and replace with \(macroContent.count) chars")
+            logCallback?("Macro found! Will delete \(hookState.backspaceCount) chars and replace with \(macroContent.count) chars")
 
             hasHandledMacro = true
             return true

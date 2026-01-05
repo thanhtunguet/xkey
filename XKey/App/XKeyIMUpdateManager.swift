@@ -40,13 +40,13 @@ class XKeyIMUpdateManager {
     func needsUpdate() -> Bool {
         guard let bundledPath = bundledXKeyIMPath,
               FileManager.default.fileExists(atPath: bundledPath) else {
-            logDebug("⚠️ XKeyIM: No bundled version found in XKey.app/Contents/Resources/")
+            logDebug("XKeyIM: No bundled version found in XKey.app/Contents/Resources/")
             return false
         }
         
         // Check if XKeyIM is installed
         guard FileManager.default.fileExists(atPath: installedXKeyIMPath) else {
-            logDebug("ℹ️ XKeyIM: Not installed yet, will install bundled version")
+            logDebug("XKeyIM: Not installed yet, will install bundled version")
             return true
         }
         
@@ -54,13 +54,13 @@ class XKeyIMUpdateManager {
         let installedVersion = getVersion(at: installedXKeyIMPath)
         let bundledVersion = getVersion(at: bundledPath)
         
-        logDebug("📊 XKeyIM Version Check:")
+        logDebug("XKeyIM Version Check:")
         logDebug("   Installed: \(installedVersion ?? "unknown")")
         logDebug("   Bundled:   \(bundledVersion ?? "unknown")")
         
         guard let installed = installedVersion,
               let bundled = bundledVersion else {
-            logDebug("⚠️ XKeyIM: Could not determine versions")
+            logDebug("XKeyIM: Could not determine versions")
             return false
         }
         
@@ -68,9 +68,9 @@ class XKeyIMUpdateManager {
         let needsUpdate = compareVersions(bundled, installed) == .orderedDescending
         
         if needsUpdate {
-            logDebug("🆕 XKeyIM: Update available (\(installed) → \(bundled))")
+            logDebug("XKeyIM: Update available (\(installed) → \(bundled))")
         } else {
-            logDebug("✅ XKeyIM: Up to date (\(installed))")
+            logDebug("XKeyIM: Up to date (\(installed))")
         }
         
         return needsUpdate
@@ -123,7 +123,7 @@ class XKeyIMUpdateManager {
     func installBundledXKeyIM(showNotification: Bool = true) -> Bool {
         guard let bundledPath = bundledXKeyIMPath,
               FileManager.default.fileExists(atPath: bundledPath) else {
-            logDebug("❌ XKeyIM: Cannot install - bundled version not found")
+            logDebug("XKeyIM: Cannot install - bundled version not found")
             return false
         }
         
@@ -134,9 +134,9 @@ class XKeyIMUpdateManager {
             : nil
         
         if let installed = installedVersion, let bundled = bundledVersion {
-            logDebug("📦 XKeyIM: Installing bundled version (\(installed) → \(bundled))...")
+            logDebug("XKeyIM: Installing bundled version (\(installed) → \(bundled))...")
         } else {
-            logDebug("📦 XKeyIM: Installing bundled version...")
+            logDebug("XKeyIM: Installing bundled version...")
         }
         
         // Kill running XKeyIM process if exists
@@ -150,7 +150,7 @@ class XKeyIMUpdateManager {
         do {
             try FileManager.default.createDirectory(atPath: inputMethodsDir, withIntermediateDirectories: true)
         } catch {
-            logDebug("❌ XKeyIM: Failed to create Input Methods directory: \(error)")
+            logDebug("XKeyIM: Failed to create Input Methods directory: \(error)")
             return false
         }
         
@@ -158,9 +158,9 @@ class XKeyIMUpdateManager {
         if FileManager.default.fileExists(atPath: installedXKeyIMPath) {
             do {
                 try FileManager.default.removeItem(atPath: installedXKeyIMPath)
-                logDebug("   Removed old version")
+                logDebug("Removed old version")
             } catch {
-                logDebug("⚠️ XKeyIM: Failed to remove old version: \(error)")
+                logDebug("XKeyIM: Failed to remove old version: \(error)")
                 // Continue anyway, copyItem might overwrite
             }
         }
@@ -168,20 +168,20 @@ class XKeyIMUpdateManager {
         // Copy new version
         do {
             try FileManager.default.copyItem(atPath: bundledPath, toPath: installedXKeyIMPath)
-            logDebug("   Copied new version")
+            logDebug("Copied new version")
         } catch {
-            logDebug("❌ XKeyIM: Failed to copy new version: \(error)")
+            logDebug("XKeyIM: Failed to copy new version: \(error)")
             return false
         }
         
         // Verify installation
         guard FileManager.default.fileExists(atPath: installedXKeyIMPath) else {
-            logDebug("❌ XKeyIM: Installation verification failed")
+            logDebug("XKeyIM: Installation verification failed")
             return false
         }
         
         let finalVersion = getVersion(at: installedXKeyIMPath)
-        logDebug("✅ XKeyIM: Installed successfully (v\(finalVersion ?? "unknown"))")
+        logDebug("XKeyIM: Installed successfully (v\(finalVersion ?? "unknown"))")
         
         // Show notification to user
         if showNotification {
@@ -202,11 +202,11 @@ class XKeyIMUpdateManager {
             task.waitUntilExit()
             
             if task.terminationStatus == 0 {
-                logDebug("   Killed running XKeyIM process")
+                logDebug("Killed running XKeyIM process")
             }
         } catch {
             // Process might not be running, that's okay
-            logDebug("   No running XKeyIM process found")
+            logDebug("No running XKeyIM process found")
         }
     }
     
@@ -219,7 +219,7 @@ class XKeyIMUpdateManager {
         
         NSUserNotificationCenter.default.deliver(notification)
         
-        logDebug("📬 XKeyIM: Update notification sent to user")
+        logDebug("XKeyIM: Update notification sent to user")
     }
     
     // MARK: - Auto-Update Check
@@ -227,19 +227,19 @@ class XKeyIMUpdateManager {
     /// Check and install XKeyIM update if available
     /// Called automatically when XKey app updates
     func checkAndInstallUpdate() {
-        logDebug("🔍 XKeyIM: Checking for updates...")
+        logDebug("XKeyIM: Checking for updates...")
         
         if needsUpdate() {
             installBundledXKeyIM(showNotification: true)
         } else {
-            logDebug("✅ XKeyIM: Already up to date")
+            logDebug("XKeyIM: Already up to date")
         }
     }
     
     // MARK: - Debug Logging
     
     private func logDebug(_ message: String) {
-        debugLogCallback?(message)
+        // Only use DebugLogger (which writes to file), debugWindowController will read from file
         sharedLogInfo(message)
     }
 }

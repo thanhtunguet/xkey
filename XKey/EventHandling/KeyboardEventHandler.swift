@@ -88,6 +88,10 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         didSet { updateEngineSettings() }
     }
     
+    @Published var addSpaceAfterMacro: Bool = false {
+        didSet { updateEngineSettings() }
+    }
+    
     // Smart switch
     @Published var smartSwitchEnabled: Bool = false {
         didSet { updateEngineSettings() }
@@ -305,10 +309,15 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
             return event
         }
 
-        // Handle Tab key - reset engine and mid-sentence flag (new field)
+        // Handle Tab key - reset engine but preserve mid-sentence state
+        // Tab adds indentation/whitespace, it doesn't move to a new field
+        // When user types Enter + Tab (e.g., starting a new indented line in code),
+        // they may still have text on the right side. Forward Delete must be blocked.
+        // NOTE: Only real field switches (like Tab in a form) should reset mid-sentence,
+        // but we can't distinguish that from regular Tab, so preserve state to be safe.
         if keyCode == 0x30 { // Tab
             engine.reset()
-            injector.markNewSession(cursorMoved: false)  // New field, not mid-sentence
+            injector.markNewSession(preserveMidSentence: true)  // Preserve mid-sentence state
             return event
         }
 
@@ -444,14 +453,18 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                 // This prevents restoring autocompleted text (like emojis)
                 engine.reset()
             }
-            // NOTE: Do NOT reset mid-sentence flag on Enter/Return
-            // When user presses Enter in the middle of text (e.g., line 2 of 3 lines),
-            // there's still text on the right side. If we reset isTypingMidSentence,
-            // Forward Delete will incorrectly delete that text when adding diacritics.
-            // The mid-sentence flag should only be reset when:
-            // - User clicks mouse (handled by resetWithCursorMoved)
-            // - User tabs to new field (handled above)
-            // - User starts typing in a completely new context
+            
+            // CRITICAL FIX: When Enter/Return is pressed, set isTypingMidSentence = true
+            // After inserting a newline, cursor will be at the start of a new line.
+            // If there are any lines below, Forward Delete would pull up the next line.
+            // By setting isTypingMidSentence = true, we prevent Forward Delete from being sent.
+            // This is essential for multi-line editing scenarios like:
+            // - User is at end of line 1 of 3 lines, presses Enter to create new line
+            // - New line is between line 1 and old line 2
+            // - When typing Vietnamese on new line, Forward Delete must be blocked
+            if character == "\n" || character == "\r" {
+                injector.markNewSession(cursorMoved: true)  // Treat Enter as cursor movement
+            }
             
             return event
         }
@@ -577,6 +590,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.macroEnabled = macroEnabled
         settings.macroInEnglishMode = macroInEnglishMode
         settings.autoCapsMacro = autoCapsMacro
+        settings.addSpaceAfterMacro = addSpaceAfterMacro
         
         // Smart switch
         settings.smartSwitchEnabled = smartSwitchEnabled

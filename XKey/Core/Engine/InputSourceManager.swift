@@ -130,7 +130,7 @@ class InputSourceManager {
             shouldEnable = config.isXKeyEnabled(for: newSource.id)
         }
 
-        debugLogCallback?("🌐 Input Source: \(previousSource) → \(newSource.displayName) [XKey: \(shouldEnable ? "ON" : "OFF")]")
+        debugLogCallback?("Input Source: \(previousSource) → \(newSource.displayName) [XKey: \(shouldEnable ? "ON" : "OFF")]")
 
         // Notify delegate
         onInputSourceChanged?(newSource, shouldEnable)
@@ -152,7 +152,7 @@ class InputSourceManager {
     /// This is used when a hotkey that conflicts with macOS input source shortcuts is pressed
     func temporarilyIgnoreInputSourceChanges(forSeconds seconds: TimeInterval = 0.5) {
         ignoreInputSourceChangesUntil = Date().addingTimeInterval(seconds)
-        debugLogCallback?("⏸️ Temporarily ignoring input source changes for \(seconds)s")
+        debugLogCallback?("Temporarily ignoring input source changes for \(seconds)s")
     }
 
     // MARK: - Configuration Management
@@ -165,7 +165,7 @@ class InputSourceManager {
         // If this is the current input source, trigger the change immediately
         if currentInputSource?.id == inputSourceID {
             if let source = currentInputSource {
-                debugLogCallback?("🔧 Input Source '\(source.displayName)' → XKey: \(enabled ? "ON" : "OFF") (applied now)")
+                debugLogCallback?("Input Source '\(source.displayName)' → XKey: \(enabled ? "ON" : "OFF") (applied now)")
                 onInputSourceChanged?(source, enabled)
 
                 // Also post notification for UI

@@ -81,7 +81,7 @@ class MacroManagementViewModel: ObservableObject {
         
         // Check if already exists
         if macros.contains(where: { $0.text == text }) {
-            log("   ❌ Macro '\(text)' already exists")
+            log("   Macro '\(text)' already exists")
             return false
         }
         
@@ -100,11 +100,11 @@ class MacroManagementViewModel: ObservableObject {
     }
     
     func updateMacro(_ macro: MacroItem, newText: String, newContent: String) -> Bool {
-        log("✏️ updateMacro called: '\(macro.text)' → '\(newText)' with content '\(newContent)'")
+        log("updateMacro called: '\(macro.text)' → '\(newText)' with content '\(newContent)'")
         
         // Check if new text conflicts with another macro (but not itself)
         if newText != macro.text && macros.contains(where: { $0.text == newText }) {
-            log("   ❌ Macro '\(newText)' already exists")
+            log("   Macro '\(newText)' already exists")
             return false
         }
         
@@ -127,7 +127,7 @@ class MacroManagementViewModel: ObservableObject {
     }
     
     func deleteMacro(_ macro: MacroItem) {
-        log("🗑️ deleteMacro called: '\(macro.text)'")
+        log("deleteMacro called: '\(macro.text)'")
         macros.removeAll { $0.id == macro.id }
         
         // Save to plist first
@@ -139,7 +139,7 @@ class MacroManagementViewModel: ObservableObject {
     }
     
     func clearAll() {
-        log("🗑️ clearAll called")
+        log("clearAll called")
         macros.removeAll()
         
         // Save to plist first

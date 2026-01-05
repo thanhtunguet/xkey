@@ -65,6 +65,7 @@ class VNEngine {
     var vUseMacro = 0              // 0: No, 1: Yes
     var vUseMacroInEnglishMode = 0 // 0: No, 1: Yes
     var vAutoCapsMacro = 0         // 0: No, 1: Yes
+    var vAddSpaceAfterMacro = 0    // 0: No, 1: Yes (add space after macro expansion)
     var vUseSmartSwitchKey = 0     // 0: No, 1: Yes
     var vUpperCaseFirstChar = 0    // 0: No, 1: Yes
     var vTempOffSpelling = 0       // 0: No, 1: Yes (temp off spell check via toolbar)
@@ -155,7 +156,7 @@ class VNEngine {
     func handleKeyEvent(keyCode: UInt16, character: Character, isUppercase: Bool, hasOtherModifier: Bool) -> HookState {
         // Debug: Log Space key
         if keyCode == VietnameseData.KEY_SPACE {
-            logCallback?("⌨️ SPACE KEY RECEIVED: keyCode=\(keyCode), index=\(index)")
+            logCallback?("SPACE KEY RECEIVED: keyCode=\(keyCode), index=\(index)")
         }
         
         // Save macroKey before reset (it accumulates across key events)
@@ -2863,7 +2864,7 @@ extension VNEngine {
         logCallback?("[Accessibility - Focused App]")
         
         guard let focusedApp = NSWorkspace.shared.frontmostApplication else {
-            logCallback?("  ❌ No frontmost application")
+            logCallback?("  No frontmost application")
             return
         }
         
@@ -2876,7 +2877,7 @@ extension VNEngine {
         let focusResult = AXUIElementCopyAttributeValue(appElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
         
         guard focusResult == .success, let element = focusedElement else {
-            logCallback?("  ❌ Cannot get focused element (error: \(focusResult.rawValue))")
+            logCallback?("  Cannot get focused element (error: \(focusResult.rawValue))")
             return
         }
         
@@ -2913,7 +2914,7 @@ extension VNEngine {
                         let lastWord = words.last ?? ""
                         
                         logCallback?("  Text before cursor: \"\(textBeforeCursor.suffix(50))\"")
-                        logCallback?("  ✅ Last word: \"\(lastWord)\"")
+                        logCallback?("  Last word: \"\(lastWord)\"")
                         
                         // Show Unicode code points
                         if !lastWord.isEmpty {
@@ -2924,11 +2925,11 @@ extension VNEngine {
                         logCallback?("  Cursor at position 0 or invalid")
                     }
                 } else {
-                    logCallback?("  ❌ Cannot get text value (error: \(textResult.rawValue))")
+                    logCallback?("  Cannot get text value (error: \(textResult.rawValue))")
                 }
             }
         } else {
-            logCallback?("  ❌ Cannot get selected text range (error: \(rangeResult.rawValue))")
+            logCallback?("  Cannot get selected text range (error: \(rangeResult.rawValue))")
             
             // Try alternative: get selected text directly
             var selectedTextValue: CFTypeRef?
@@ -2967,6 +2968,16 @@ extension VNEngine {
             for charData in hookState.macroData {
                 let vnChar = convertToVNCharacter(charData)
                 result.newCharacters.append(vnChar)
+            }
+            
+            // Add space after macro if enabled
+            // The trigger character (space, comma, period) is passed as currentCharacter
+            // We add it after the macro content if addSpaceAfterMacro is enabled
+            if vAddSpaceAfterMacro == 1 {
+                if let character = currentCharacter {
+                    // Add the trigger character (space, comma, or period) after macro
+                    result.newCharacters.append(VNCharacter(character: character))
+                }
             }
         } else {
             // Convert character data to VNCharacter array

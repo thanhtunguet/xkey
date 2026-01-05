@@ -39,7 +39,7 @@ class StatusBarManager: ObservableObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         guard let button = statusItem?.button else {
-            log("❌ Failed to create status bar button")
+            log("Failed to create status bar button")
             return
         }
         
@@ -92,7 +92,7 @@ class StatusBarManager: ObservableObject {
             }
             .store(in: &cancellables)
         
-        log("✅ Status bar setup complete")
+        log("Status bar setup complete")
     }
     
     private func createMenu() -> NSMenu {
@@ -220,7 +220,7 @@ class StatusBarManager: ObservableObject {
     
     private func updateMenu() {
         guard let menu = statusItem?.menu else {
-            log("⚠️ updateMenu: menu is nil!")
+            log("updateMenu: menu is nil!")
             return
         }
         
@@ -271,7 +271,7 @@ class StatusBarManager: ObservableObject {
         log("📋 selectInputMethod: tag=\(sender.tag), title=\(sender.title)")
         
         guard let method = InputMethod(rawValue: sender.tag) else {
-            log("⚠️ selectInputMethod: Invalid tag \(sender.tag)")
+            log("selectInputMethod: Invalid tag \(sender.tag)")
             return
         }
         
@@ -282,7 +282,7 @@ class StatusBarManager: ObservableObject {
             for item in submenu.items {
                 item.state = (item.tag == method.rawValue) ? .on : .off
             }
-            log("✅ Updated submenu items directly")
+            log("Updated submenu items directly")
         }
     }
     
@@ -385,13 +385,13 @@ class StatusBarManager: ObservableObject {
     private func rebuildMenu() {
         guard statusItem != nil else { return }
         
-        log("🔄 Rebuilding menu with new hotkey")
+        log("Rebuilding menu with new hotkey")
         
         // Create new menu with updated hotkey
         let menu = createMenu()
         statusItem?.menu = menu
         
-        log("✅ Menu rebuilt successfully")
+        log("Menu rebuilt successfully")
     }
     
     private var cancellables = Set<AnyCancellable>()

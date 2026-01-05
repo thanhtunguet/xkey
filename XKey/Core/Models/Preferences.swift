@@ -51,6 +51,7 @@ struct Preferences: Codable {
     var macroEnabled: Bool = false               // Enable text shortcuts
     var macroInEnglishMode: Bool = false         // Use macro in English mode
     var autoCapsMacro: Bool = false              // Auto capitalize macro output
+    var addSpaceAfterMacro: Bool = false         // Add space after macro expansion
     
     // Smart switch settings
     var smartSwitchEnabled: Bool = false         // Remember language per app

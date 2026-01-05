@@ -90,7 +90,12 @@ class DebugLogger {
         guard isLoggingEnabled else { return }
         
         let prefix = level.emoji
-        let fullMessage = source.isEmpty ? "\(prefix) \(message)" : "\(prefix) [\(source)] \(message)"
+        let fullMessage: String
+        if prefix.isEmpty {
+            fullMessage = source.isEmpty ? message : "[\(source)] \(message)"
+        } else {
+            fullMessage = source.isEmpty ? "\(prefix) \(message)" : "\(prefix) [\(source)] \(message)"
+        }
 
         // Check level before writing
         switch level {
@@ -148,11 +153,11 @@ enum LogLevel {
 
     var emoji: String {
         switch self {
-        case .info: return "ℹ️"
-        case .warning: return "⚠️"
-        case .error: return "❌"
-        case .success: return "✅"
-        case .debug: return "🔍"
+        case .info: return ""
+        case .warning: return "[WARN]"
+        case .error: return "[ERROR]"
+        case .success: return "[OK]"
+        case .debug: return "[DEBUG]"
         }
     }
 }

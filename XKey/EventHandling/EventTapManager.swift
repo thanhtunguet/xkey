@@ -81,19 +81,16 @@ class EventTapManager {
     // MARK: - Public Methods
     
     func start() throws {
-        debugLogCallback?("🚀 EventTapManager.start() called")
-
         guard !isEnabled else {
-            debugLogCallback?("  ❌ Already running")
             throw EventTapError.alreadyRunning
         }
 
         // Check accessibility permission
         guard checkAccessibilityPermission() else {
-            debugLogCallback?("  ❌ No accessibility permission")
+            debugLogCallback?("No accessibility permission")
             throw EventTapError.accessibilityPermissionDenied
         }
-        debugLogCallback?("  ✅ Accessibility permission OK")
+        debugLogCallback?("Accessibility permission OK")
 
         // Create event mask for keyboard events
         let eventMask: CGEventMask = (
@@ -101,7 +98,7 @@ class EventTapManager {
             (1 << CGEventType.keyUp.rawValue) |
             (1 << CGEventType.flagsChanged.rawValue)
         )
-        debugLogCallback?("  📊 Event mask: \(eventMask)")
+        debugLogCallback?("Event mask: \(eventMask)")
         
         // Callback closure for event tap
         let callback: CGEventTapCallBack = { proxy, type, event, refcon in
@@ -125,7 +122,6 @@ class EventTapManager {
         // Create event tap - try HID level first, fallback to session
         // HID level intercepts events BEFORE session level, providing better timing
         // and avoiding keystroke "swallowing" issues in terminals
-        debugLogCallback?("  🔧 Creating event tap (trying HID level first)...")
         var tap = CGEvent.tapCreate(
             tap: .cghidEventTap,
             place: .headInsertEventTap,
@@ -136,10 +132,10 @@ class EventTapManager {
         )
         
         if tap != nil {
-            debugLogCallback?("  ✅ Event tap created at HID level")
+            debugLogCallback?("Event tap created at HID level")
         } else {
             // Fallback to session level
-            debugLogCallback?("  ⚠️ HID tap failed, trying session level...")
+            debugLogCallback?("HID tap failed, trying session level...")
             tap = CGEvent.tapCreate(
                 tap: .cgSessionEventTap,
                 place: .headInsertEventTap,
@@ -149,40 +145,36 @@ class EventTapManager {
                 userInfo: userInfo
             )
             if tap != nil {
-                debugLogCallback?("  ✅ Event tap created at session level")
+                debugLogCallback?("Event tap created at session level")
             }
         }
         
         guard let tap = tap else {
-            debugLogCallback?("  ❌ Failed to create event tap!")
+            debugLogCallback?("Failed to create event tap!")
             throw EventTapError.creationFailed
         }
         
         eventTap = tap
 
         // Create run loop source
-        debugLogCallback?("  🔄 Creating run loop source...")
+        debugLogCallback?("Creating run loop source...")
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
 
         guard let source = runLoopSource else {
-            debugLogCallback?("  ❌ Failed to create run loop source")
+            debugLogCallback?("Failed to create run loop source")
             eventTap = nil
             throw EventTapError.creationFailed
         }
-        debugLogCallback?("  ✅ Run loop source created")
 
         // Add to current run loop
-        debugLogCallback?("  🔄 Adding to run loop...")
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
-        debugLogCallback?("  ✅ Added to run loop")
 
         // Enable the event tap
-        debugLogCallback?("  ⚡ Enabling event tap...")
         CGEvent.tapEnable(tap: tap, enable: true)
-        debugLogCallback?("  ✅ Event tap enabled")
+        debugLogCallback?("Event tap enabled")
 
         isEnabled = true
-        debugLogCallback?("✅ Event tap fully started!")
+        debugLogCallback?("Event tap fully started!")
     }
 
     func stop() {
@@ -203,7 +195,7 @@ class EventTapManager {
         
         isEnabled = false
         
-        debugLogCallback?("⏹️ Event tap stopped")
+        debugLogCallback?("Event tap stopped")
     }
     
     func restart() throws {
@@ -216,7 +208,7 @@ class EventTapManager {
         guard isEnabled else { return }
 
         isSuspended = true
-        debugLogCallback?("⏸️ Event tap suspended (IMKit active)")
+        debugLogCallback?("Event tap suspended (IMKit active)")
     }
 
     /// Resume event tap (when leaving IMKit mode)
@@ -224,7 +216,7 @@ class EventTapManager {
         guard isEnabled else { return }
 
         isSuspended = false
-        debugLogCallback?("▶️ Event tap resumed (IMKit inactive)")
+        debugLogCallback?("Event tap resumed (IMKit inactive)")
     }
 
     // MARK: - Event Callback
@@ -244,9 +236,9 @@ class EventTapManager {
         // This prevents re-processing of backspaces/text we inject, which causes
         // race conditions and duplicate diacritics in terminal apps
         if event.getIntegerValueField(.eventSourceUserData) == kXKeyEventMarker {
-            debugLogCallback?("  → Skipping XKey-injected event (marker detected)")
+            debugLogCallback?(" → Skipping XKey-injected event (marker detected)")
             // Also print directly for debugging
-            debugLogCallback?("🛡️ MARKER SKIP: type=\(type.rawValue), keyCode=\(event.getIntegerValueField(.keyboardEventKeycode))")
+            debugLogCallback?("MARKER SKIP: type=\(type.rawValue), keyCode=\(event.getIntegerValueField(.keyboardEventKeycode))")
             return Unmanaged.passUnretained(event)
         }
 
@@ -268,7 +260,7 @@ class EventTapManager {
                 if type == .flagsChanged {
                     let eventModifiers = ModifierFlags(from: event.flags)
                     
-                    debugLogCallback?("  → flagsChanged: eventModifiers=\(eventModifiers.rawValue), hotkey.modifiers=\(hotkey.modifiers.rawValue)")
+                    debugLogCallback?(" → flagsChanged: eventModifiers=\(eventModifiers.rawValue), hotkey.modifiers=\(hotkey.modifiers.rawValue)")
                     
                     // Check if all required modifiers are currently pressed
                     // Use "contains" to allow for additional modifiers like CapsLock
@@ -281,7 +273,7 @@ class EventTapManager {
                         if !modifierOnlyState.targetModifiersReached {
                             modifierOnlyState.targetModifiersReached = true
                             modifierOnlyState.hasTriggered = false
-                            debugLogCallback?("  → Target modifiers REACHED: \(hotkey.displayString)")
+                            debugLogCallback?(" → Target modifiers REACHED: \(hotkey.displayString)")
                         }
                         modifierOnlyState.currentModifiers = eventModifiers
                     } else {
@@ -289,7 +281,7 @@ class EventTapManager {
                         if modifierOnlyState.targetModifiersReached && !modifierOnlyState.hasTriggered {
                             // Was holding target modifiers, now released - TRIGGER!
                             modifierOnlyState.hasTriggered = true
-                            debugLogCallback?("  → MODIFIER-ONLY HOTKEY TRIGGERED on release: \(hotkey.displayString)")
+                            debugLogCallback?(" → MODIFIER-ONLY HOTKEY TRIGGERED on release: \(hotkey.displayString)")
                             DispatchQueue.main.async { [weak self] in
                                 self?.onToggleHotkey?()
                             }
@@ -301,7 +293,7 @@ class EventTapManager {
                 } else if type == .keyDown {
                     // If user presses any key while holding modifiers, cancel the modifier-only hotkey
                     if modifierOnlyState.targetModifiersReached {
-                        debugLogCallback?("  → Key pressed while holding modifiers - canceling modifier-only hotkey")
+                        debugLogCallback?(" → Key pressed while holding modifiers - canceling modifier-only hotkey")
                         modifierOnlyState.targetModifiersReached = false
                         modifierOnlyState.hasTriggered = true  // Prevent trigger on release
                     }
@@ -312,7 +304,7 @@ class EventTapManager {
                 if type == .keyDown {
                     let eventModifiers = ModifierFlags(from: event.flags)
                     if event.keyCode == hotkey.keyCode && eventModifiers == hotkey.modifiers {
-                        debugLogCallback?("  → TOGGLE HOTKEY DETECTED - consuming event")
+                        debugLogCallback?(" → TOGGLE HOTKEY DETECTED - consuming event")
                         // Call toggle callback on main thread
                         DispatchQueue.main.async { [weak self] in
                             self?.onToggleHotkey?()
@@ -346,17 +338,17 @@ class EventTapManager {
 
         // Check if delegate wants to process this event
         guard let delegate = delegate else {
-            debugLogCallback?("  → No delegate!")
+            debugLogCallback?(" → No delegate!")
             return Unmanaged.passUnretained(event)
         }
 
-        debugLogCallback?("  → Calling shouldProcessEvent...")
+        debugLogCallback?(" → Calling shouldProcessEvent...")
         guard delegate.shouldProcessEvent(event, type: type) else {
-            debugLogCallback?("  → shouldProcessEvent returned false")
+            debugLogCallback?(" → shouldProcessEvent returned false")
             return Unmanaged.passUnretained(event)
         }
 
-        debugLogCallback?("  → Calling processKeyEvent...")
+        debugLogCallback?(" → Calling processKeyEvent...")
         // Process event through delegate with proxy
         if let processedEvent = delegate.processKeyEvent(event, type: type, proxy: proxy) {
             return Unmanaged.passUnretained(processedEvent)

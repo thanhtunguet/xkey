@@ -61,7 +61,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Get the macro manager for external access
     func getMacroManager() -> MacroManager? {
         if keyboardHandler == nil {
-            logToDebugWindow("⚠️ AppDelegate.getMacroManager: keyboardHandler is nil!")
+            logToDebugWindow("AppDelegate.getMacroManager: keyboardHandler is nil!")
             return nil
         }
         return keyboardHandler?.getMacroManager()
@@ -86,14 +86,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create debug window first
         setupDebugWindow()
         
-        debugWindowController?.logEvent("🚀 XKey starting...")
-
         // Load and apply preferences
         let preferences = SharedSettings.shared.loadPreferences()
         
         // Load custom Window Title Rules
         AppBehaviorDetector.shared.loadCustomRules()
-        debugWindowController?.logEvent("  ✅ Loaded \(AppBehaviorDetector.shared.getCustomRules().count) custom Window Title Rules")
+        debugWindowController?.logEvent("Loaded \(AppBehaviorDetector.shared.getCustomRules().count) custom Window Title Rules")
         
         // Initialize components
         setupKeyboardHandling()
@@ -133,7 +131,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupSpellCheckDictionary()
 
         debugWindowController?.updateStatus("XKey started successfully")
-        debugWindowController?.logEvent("✅ XKey started successfully")
+        debugWindowController?.logEvent("XKey started successfully")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -200,11 +198,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             switch url.host {
             case "settings", "preferences":
                 // Open settings window
-                debugWindowController?.logEvent("📲 Received URL: \(url.absoluteString) - opening settings")
+                debugWindowController?.logEvent("Received URL: \(url.absoluteString) - opening settings")
                 openPreferences()
             default:
                 // Just activate the app
-                debugWindowController?.logEvent("📲 Received URL: \(url.absoluteString)")
+                debugWindowController?.logEvent("Received URL: \(url.absoluteString)")
                 NSApp.activate(ignoringOtherApps: true)
             }
         }
@@ -221,7 +219,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if shouldShowDebug {
             debugWindowController = DebugWindowController()
             debugWindowController?.showWindow(nil)
-            debugWindowController?.logEvent("✅ Debug window created (enabled in settings)")
 
             // Connect DebugLogger to debug window
             DebugLogger.shared.debugWindowController = debugWindowController
@@ -234,17 +231,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Setup verbose logging callback - sync with keyboardHandler
             debugWindowController?.setupVerboseLoggingCallback { [weak self] isVerbose in
                 self?.keyboardHandler?.verboseEngineLogging = isVerbose
-                self?.debugWindowController?.logEvent(isVerbose ? "🔍 Verbose engine logging ENABLED (may cause lag)" : "🔍 Verbose engine logging DISABLED")
+                self?.debugWindowController?.logEvent(isVerbose ? "Verbose engine logging ENABLED (may cause lag)" : "Verbose engine logging DISABLED")
             }
         }
     }
 
     private func setupKeyboardHandling() {
-        debugWindowController?.logEvent("🔧 Setting up keyboard handling...")
-
         // Create keyboard handler
         keyboardHandler = KeyboardEventHandler()
-        debugWindowController?.logEvent("  ✅ Keyboard handler created")
+        debugWindowController?.logEvent("Keyboard handler created")
         
         // Connect debug logging (only if logging is enabled)
         // Filter to reduce log spam
@@ -281,7 +276,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create event tap manager
         eventTapManager = EventTapManager()
         eventTapManager?.delegate = keyboardHandler
-        debugWindowController?.logEvent("  ✅ Event tap manager created, delegate set")
+        debugWindowController?.logEvent("Event tap manager created, delegate set")
         
         // Connect debug logging (only if logging is enabled)
         // EventTap logs are very verbose, skip most of them
@@ -293,10 +288,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Log important EventTap messages (setup, errors, status changes)
             let shouldLog = message.contains("No delegate") ||
                            message.contains("disabled") ||
-                           message.contains("🚀") ||  // Start
-                           message.contains("✅") ||  // Success
-                           message.contains("❌") ||  // Error
-                           message.contains("⏹️")    // Stop
+                           message.contains("started") ||   // Start
+                           message.contains("[OK]") ||      // Success
+                           message.contains("[ERROR]") ||   // Error
+                           message.contains("stopped")      // Stop
             
             if shouldLog {
                 debugWindow.logEvent(message)
@@ -311,7 +306,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // If so, don't start event tap yet (will be started when switching away)
         if let currentSource = InputSourceManager.getCurrentInputSource(),
            InputSourceManager.isXKeyInputSource(currentSource) {
-            debugWindowController?.logEvent("  ⏸️ Current input source is XKeyIM - event tap will NOT start")
+            debugWindowController?.logEvent("  Current input source is XKeyIM - event tap will NOT start")
             debugWindowController?.logEvent("     Event tap will start automatically when switching away from XKeyIM")
             return
         }
@@ -321,15 +316,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 try manager.start()
                 debugWindowController?.updateStatus("Event tap started - Ready to type!")
-                debugWindowController?.logEvent("  ✅ Event tap started successfully!")
             } catch {
                 debugWindowController?.updateStatus("ERROR: Failed to start event tap")
-                debugWindowController?.logEvent("  ❌ Failed to start event tap: \(error)")
             }
         } else {
             // No permission yet - don't call start() to avoid system dialog
             debugWindowController?.updateStatus("Waiting for accessibility permission...")
-            debugWindowController?.logEvent("  ⚠️ Accessibility permission not granted yet")
         }
     }
     
@@ -431,6 +423,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardHandler?.macroEnabled = preferences.macroEnabled
         keyboardHandler?.macroInEnglishMode = preferences.macroInEnglishMode
         keyboardHandler?.autoCapsMacro = preferences.autoCapsMacro
+        keyboardHandler?.addSpaceAfterMacro = preferences.addSpaceAfterMacro
         
         // Apply smart switch
         keyboardHandler?.smartSwitchEnabled = preferences.smartSwitchEnabled
@@ -462,12 +455,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Update undo typing (Esc key)
         keyboardHandler?.undoTypingEnabled = preferences.undoTypingEnabled
-        debugWindowController?.logEvent(preferences.undoTypingEnabled ? "  ✅ Undo typing enabled (Esc key)" : "  ⏹️ Undo typing disabled")
+        debugWindowController?.logEvent(preferences.undoTypingEnabled ? "Undo typing enabled (Esc key)" : "Undo typing disabled")
 
         // Log fix autocomplete setting
-        debugWindowController?.logEvent(preferences.fixAutocomplete ? "  ✅ Fix autocomplete enabled (Forward Delete)" : "  ⏹️ Fix autocomplete disabled")
+        debugWindowController?.logEvent(preferences.fixAutocomplete ? "Fix autocomplete enabled (Forward Delete)" : "Fix autocomplete disabled")
 
-        debugWindowController?.logEvent("✅ Preferences applied (including advanced features)")
+        debugWindowController?.logEvent("Preferences applied (including advanced features)")
     }
     
     // MARK: - Debug Window Management
@@ -484,9 +477,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Setup verbose logging callback - sync with keyboardHandler
                 debugWindowController?.setupVerboseLoggingCallback { [weak self] isVerbose in
                     self?.keyboardHandler?.verboseEngineLogging = isVerbose
-                    self?.debugWindowController?.logEvent(isVerbose ? "🔍 Verbose engine logging ENABLED (may cause lag)" : "🔍 Verbose engine logging DISABLED")
+                    self?.debugWindowController?.logEvent(isVerbose ? "Verbose engine logging ENABLED (may cause lag)" : "Verbose engine logging DISABLED")
                 }
-                debugWindowController?.logEvent("✅ Debug window enabled via settings")
+                debugWindowController?.logEvent("Debug window enabled via settings")
             }
             debugWindowController?.showWindow(nil)
         } else {
@@ -543,7 +536,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
         
-        debugWindowController?.logEvent("🔓 Opening System Settings for Accessibility permission")
+        debugWindowController?.logEvent("Opening System Settings for Accessibility permission")
     }
     
     private func startPermissionMonitoring() {
@@ -554,24 +547,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             if manager.checkAccessibilityPermission() {
                 // Permission granted! Try to start event tap
-                self.debugWindowController?.logEvent("✅ Accessibility permission granted!")
+                self.debugWindowController?.logEvent("Accessibility permission granted!")
                 
                 do {
                     try manager.start()
                     self.debugWindowController?.updateStatus("Event tap started - Ready to type!")
-                    self.debugWindowController?.logEvent("✅ Event tap started successfully after permission grant")
+                    self.debugWindowController?.logEvent("Event tap started successfully after permission grant")
                     
                     // Stop monitoring
                     self.permissionCheckTimer?.invalidate()
                     self.permissionCheckTimer = nil
                     
                 } catch {
-                    self.debugWindowController?.logEvent("❌ Failed to start event tap: \(error)")
+                    self.debugWindowController?.logEvent("Failed to start event tap: \(error)")
                 }
             }
         }
         
-        debugWindowController?.logEvent("👀 Started monitoring for permission changes")
+        debugWindowController?.logEvent("Started monitoring for permission changes")
     }
 
     private func setupGlobalHotkey() {
@@ -594,10 +587,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             self?.statusBarManager?.viewModel.toggleVietnamese()
             
-            self?.debugWindowController?.logEvent("🔄 Toggled Vietnamese mode via hotkey (\(hotkey.displayString))")
+            self?.debugWindowController?.logEvent("Toggled Vietnamese mode via hotkey (\(hotkey.displayString))")
         }
 
-        debugWindowController?.logEvent("  ✅ Toggle hotkey configured in EventTap: \(hotkey.displayString)")
+        debugWindowController?.logEvent("Toggle hotkey configured: \(hotkey.displayString)")
     }
     
     private func setupReadWordHotkey() {
@@ -625,7 +618,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async {
                     self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
                     
-                    self?.debugWindowController?.logEvent("⌨️ Read Word triggered via hotkey (Cmd+Shift+R)")
+                    self?.debugWindowController?.logEvent("Read Word triggered via hotkey (Cmd+Shift+R)")
                 }
             }
         }
@@ -636,7 +629,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.async {
                     self?.keyboardHandler?.engine.debugReadWordBeforeCursor()
                     
-                    self?.debugWindowController?.logEvent("⌨️ Read Word triggered via hotkey (Cmd+Shift+R)")
+                    self?.debugWindowController?.logEvent("Read Word triggered via hotkey (Cmd+Shift+R)")
                 }
                 // Return nil to consume the event
                 return nil
@@ -644,7 +637,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return event
         }
         
-        debugWindowController?.logEvent("  ✅ Read Word hotkey: Cmd+Shift+R")
+        debugWindowController?.logEvent("Read Word hotkey: Cmd+Shift+R")
     }
     
     // State tracking for modifier-only switch XKey hotkey
@@ -675,7 +668,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         switchXKeyModifierState = (false, false)
         
         guard let hotkey = hotkey else {
-            debugWindowController?.logEvent("  ⏹️ Switch XKey hotkey disabled")
+            debugWindowController?.logEvent("  Switch XKey hotkey disabled")
             return
         }
         
@@ -706,7 +699,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 // Perform toggle
                 let success = InputSourceSwitcher.shared.toggleXKey()
-                self?.debugWindowController?.logEvent("🔄 Toggle input source via hotkey (\(hotkey.displayString)) [\(action)]: \(success ? "success" : "failed")")
+                self?.debugWindowController?.logEvent("Toggle input source via hotkey (\(hotkey.displayString)) [\(action)]: \(success ? "success" : "failed")")
             }
         }
         
@@ -781,7 +774,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return event  // Pass through keyDown events
             }
             
-            debugWindowController?.logEvent("  ✅ Switch XKey hotkey (modifier-only): \(hotkey.displayString)")
+            debugWindowController?.logEvent("Switch XKey hotkey (modifier-only): \(hotkey.displayString)")
         } else {
             // Regular hotkey (e.g., Cmd+Shift+V)
             
@@ -802,7 +795,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 return event
             }
             
-            debugWindowController?.logEvent("  ✅ Switch XKey hotkey: \(hotkey.displayString)")
+            debugWindowController?.logEvent("Switch XKey hotkey: \(hotkey.displayString)")
         }
     }
 
@@ -824,10 +817,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Handle Smart Switch - auto switch language per app
             self.handleSmartSwitch(notification: notification)
 
-            self.debugWindowController?.logEvent("🔄 App switched - engine reset, mid-sentence mode")
+            self.debugWindowController?.logEvent("App switched - engine reset, mid-sentence mode")
         }
 
-        debugWindowController?.logEvent("  ✅ App switch observer registered")
+        debugWindowController?.logEvent("App switch observer registered")
 
         // Setup overlay detector callback to restore language when overlay closes
         setupOverlayDetectorCallback()
@@ -840,7 +833,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // When overlay closes (visible → hidden), restore language for current app
             if !isVisible {
-                self.debugWindowController?.logEvent("🔄 Overlay closed - restoring language for current app")
+                self.debugWindowController?.logEvent("Overlay closed - restoring language for current app")
                 self.restoreLanguageForCurrentApp()
             }
         }
@@ -879,7 +872,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusBarManager?.viewModel.isVietnameseEnabled = newEnabled
             handler.setVietnamese(newEnabled)
 
-            debugWindowController?.logEvent("🔄 Restored '\(bundleId)' → \(newEnabled ? "Vietnamese" : "English")")
+            debugWindowController?.logEvent("Restored '\(bundleId)' → \(newEnabled ? "Vietnamese" : "English")")
         }
     }
     
@@ -889,11 +882,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if show {
             // Show Dock icon - regular app mode
             NSApp.setActivationPolicy(.regular)
-            debugWindowController?.logEvent("🖥️ Dock icon: visible")
+            debugWindowController?.logEvent("Dock icon: visible")
         } else {
             // Hide Dock icon - accessory/background app mode
             NSApp.setActivationPolicy(.accessory)
-            debugWindowController?.logEvent("🖥️ Dock icon: hidden")
+            debugWindowController?.logEvent("Dock icon: hidden")
         }
     }
     
@@ -927,7 +920,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusBarManager?.viewModel.isVietnameseEnabled = newEnabled
             handler.setVietnamese(newEnabled)
             
-            debugWindowController?.logEvent("🔄 Smart Switch: '\(bundleId)' → \(newEnabled ? "Vietnamese" : "English")")
+            debugWindowController?.logEvent("Smart Switch: '\(bundleId)' → \(newEnabled ? "Vietnamese" : "English")")
         } else {
             // App is new or language hasn't changed - save current language
             handler.engine.saveAppLanguage(bundleId: bundleId, language: currentLanguage)
@@ -941,7 +934,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Global monitor - catches clicks in OTHER apps
         mouseClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             // Log that mouse click was detected (always visible, not verbose)
-            self?.debugWindowController?.logEvent("🖱️ Mouse click (global) → resetting engine buffer")
+            self?.debugWindowController?.logEvent("Mouse click (global) → resetting engine buffer")
             
             // Reset engine when mouse is clicked (likely focus change or cursor move)
             // Mark as cursor moved to disable autocomplete fix (avoid deleting text on right)
@@ -968,7 +961,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return event  // Pass through the event
         }
 
-        debugWindowController?.logEvent("  ✅ Mouse click monitor registered (global + local)")
+        debugWindowController?.logEvent("Mouse click monitor registered (global + local)")
     }
 
     /// Log detailed information about the input type when mouse is clicked
@@ -976,7 +969,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Get frontmost app info
         guard let app = NSWorkspace.shared.frontmostApplication,
               let bundleId = app.bundleIdentifier else {
-            debugWindowController?.logEvent("🖱️ Mouse click - engine reset, mid-sentence mode")
+            debugWindowController?.logEvent("Mouse click - engine reset, mid-sentence mode")
             return
         }
 
@@ -1032,7 +1025,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let imkitBehavior = detector.detectIMKitBehavior()
 
         // Log everything with nice formatting
-        debugWindowController?.logEvent("🖱️ Mouse click detected")
+        debugWindowController?.logEvent("Mouse click detected")
         debugWindowController?.logEvent("   App: \(appName) (\(bundleId))")
         debugWindowController?.logEvent("   Window: \(windowTitle.isEmpty ? "(no title)" : windowTitle)")
         debugWindowController?.logEvent("   Input Type: \(elementRole)")
@@ -1043,7 +1036,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Log matched rule if any
         if let rule = matchedRule {
-            debugWindowController?.logEvent("   ✅ Rule: \(rule.name) (pattern: \"\(rule.titlePattern)\")")
+            debugWindowController?.logEvent(" Rule: \(rule.name) (pattern: \"\(rule.titlePattern)\")")
         }
         
         debugWindowController?.logEvent("   → Engine reset, mid-sentence mode")
@@ -1062,12 +1055,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleInputSourceChange(source: source, shouldEnable: shouldEnable)
         }
 
-        debugWindowController?.logEvent("  ✅ Input Source Manager initialized")
+        debugWindowController?.logEvent("Input Source Manager initialized")
 
         // IMPORTANT: Check current input source on startup and apply config
         if let currentSource = InputSourceManager.getCurrentInputSource() {
             let shouldEnable = inputSourceManager?.isEnabled(for: currentSource.id) ?? true
-            debugWindowController?.logEvent("🌐 Initial Input Source: \(currentSource.displayName)")
+            debugWindowController?.logEvent("Initial Input Source: \(currentSource.displayName)")
             debugWindowController?.logEvent("   Should enable XKey: \(shouldEnable)")
             handleInputSourceChange(source: currentSource, shouldEnable: shouldEnable)
         }
@@ -1098,7 +1091,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Already running - just resume it
                 manager.resume()
             } catch {
-                debugWindowController?.logEvent("❌ Failed to start event tap: \(error)")
+                debugWindowController?.logEvent("Failed to start event tap: \(error)")
             }
 
             // Get current state
@@ -1110,14 +1103,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if !currentlyEnabled {
                     self.statusBarManager?.viewModel.isVietnameseEnabled = true
                     self.keyboardHandler?.setVietnamese(true)
-                    self.debugWindowController?.logEvent("✅ '\(source.displayName)' → Vietnamese ON")
+                    self.debugWindowController?.logEvent("'\(source.displayName)' → Vietnamese ON")
                 }
             } else {
                 // Disable Vietnamese mode
                 if currentlyEnabled {
                     self.statusBarManager?.viewModel.isVietnameseEnabled = false
                     self.keyboardHandler?.setVietnamese(false)
-                    self.debugWindowController?.logEvent("⏹️ '\(source.displayName)' → Vietnamese OFF")
+                    self.debugWindowController?.logEvent("'\(source.displayName)' → Vietnamese OFF")
                 }
             }
         }
@@ -1126,7 +1119,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Sparkle Auto-Update
 
     private func checkForUpdates() {
-        debugWindowController?.logEvent("🔍 Manually checking for updates...")
+        debugWindowController?.logEvent("Manually checking for updates...")
         // Activate app to bring update dialog to front
         NSApp.activate(ignoringOtherApps: true)
         updaterController?.updater.checkForUpdates()
@@ -1134,7 +1127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Check for updates from SwiftUI views (activates app to bring dialog to front)
     func checkForUpdatesFromUI() {
-        debugWindowController?.logEvent("🔍 [UI] Manually checking for updates...")
+        debugWindowController?.logEvent("[UI] Manually checking for updates...")
         
         // Must be called on main thread
         DispatchQueue.main.async { [weak self] in
@@ -1145,10 +1138,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Use the same method as menu bar - updater.checkForUpdates()
             if let updater = self.updaterController?.updater {
-                self.debugWindowController?.logEvent("✅ [UI] Calling updater.checkForUpdates()")
+                self.debugWindowController?.logEvent("[UI] Calling updater.checkForUpdates()")
                 updater.checkForUpdates()
             } else {
-                self.debugWindowController?.logEvent("❌ [UI] updaterController or updater is nil!")
+                self.debugWindowController?.logEvent("[UI] updaterController or updater is nil!")
             }
         }
     }
@@ -1176,7 +1169,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 userDriverDelegate: sparkleUpdateDelegate  // Also use as user driver delegate to bring update dialog to front
             )
             
-            debugWindowController?.logEvent("✅ Sparkle auto-update initialized")
+            debugWindowController?.logEvent("Sparkle auto-update initialized")
             debugWindowController?.logEvent("   Feed URL: \(Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String ?? "Not configured")")
             debugWindowController?.logEvent("   Auto-check: \(Bundle.main.object(forInfoDictionaryKey: "SUEnableAutomaticChecks") as? Bool ?? false)")
             debugWindowController?.logEvent("   Update delegate: SparkleUpdateDelegate (settings will be saved before restart)")
@@ -1189,15 +1182,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 
                 // Use background check - won't show UI if no update available
                 if updater.canCheckForUpdates {
-                    self?.debugWindowController?.logEvent("🔍 Checking for updates in background (startup check)...")
+                    self?.debugWindowController?.logEvent("Checking for updates in background (startup check)...")
                     updater.checkForUpdatesInBackground()
                 } else {
-                    self?.debugWindowController?.logEvent("⏸️ Skipping startup update check (already checking or in progress)")
+                    self?.debugWindowController?.logEvent("Skipping startup update check (already checking or in progress)")
                 }
             }
             
         } catch {
-            debugWindowController?.logEvent("❌ Failed to initialize Sparkle: \(error)")
+            debugWindowController?.logEvent("Failed to initialize Sparkle: \(error)")
         }
     }
 
@@ -1222,7 +1215,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let preferences = SharedSettings.shared.loadPreferences()
 
         guard preferences.spellCheckEnabled else {
-            debugWindowController?.logEvent("  ⏭️ Spell checking disabled, skipping dictionary load")
+            debugWindowController?.logEvent("  Spell checking disabled, skipping dictionary load")
             return
         }
 
@@ -1235,12 +1228,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 try VNDictionaryManager.shared.loadDictionary(style: style)
                 let stats = VNDictionaryManager.shared.getDictionaryStats()
                 let count = stats[style.rawValue] ?? 0
-                debugWindowController?.logEvent("  ✅ Loaded \(style.rawValue) dictionary (\(count) words)")
+                debugWindowController?.logEvent("Loaded \(style.rawValue) dictionary (\(count) words)")
             } catch {
-                debugWindowController?.logEvent("  ⚠️ Failed to load dictionary: \(error.localizedDescription)")
+                debugWindowController?.logEvent("Failed to load dictionary: \(error.localizedDescription)")
             }
         } else {
-            debugWindowController?.logEvent("  ℹ️ Dictionary not found. User can download from Settings > Spell Checking")
+            debugWindowController?.logEvent("Dictionary not found. User can download from Settings > Spell Checking")
         }
     }
 
@@ -1254,7 +1247,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Only setup toolbar if enabled
         guard preferences.tempOffToolbarEnabled else {
-            debugWindowController?.logEvent("  ⏹️ Temp off toolbar disabled")
+            debugWindowController?.logEvent("Temp off toolbar disabled")
             return
         }
 
@@ -1270,7 +1263,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             self?.handleTempOffToolbarSettingsChange()
         }
-        debugWindowController?.logEvent("  ✅ Temp off toolbar settings observer registered")
+        debugWindowController?.logEvent("Temp off toolbar settings observer registered")
     }
 
     /// Handle toolbar settings changes (enable/disable or hotkey change)
@@ -1278,10 +1271,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let preferences = SharedSettings.shared.loadPreferences()
 
         if preferences.tempOffToolbarEnabled {
-            debugWindowController?.logEvent("🔧 Temp off toolbar settings changed - enabling")
+            debugWindowController?.logEvent("Temp off toolbar settings changed - enabling")
             enableTempOffToolbar()
         } else {
-            debugWindowController?.logEvent("🔧 Temp off toolbar settings changed - disabling")
+            debugWindowController?.logEvent("Temp off toolbar settings changed - disabling")
             disableTempOffToolbar()
         }
     }
@@ -1296,7 +1289,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.keyboardHandler?.engine.vTempOffSpelling = spellingOff ? 1 : 0
             self.keyboardHandler?.engine.vTempOffEngine = engineOff ? 1 : 0
 
-            self.debugWindowController?.logEvent("🔧 Toolbar state changed: spelling=\(spellingOff ? "OFF" : "ON"), engine=\(engineOff ? "OFF" : "ON")")
+            self.debugWindowController?.logEvent("Toolbar state changed: spelling=\(spellingOff ? "OFF" : "ON"), engine=\(engineOff ? "OFF" : "ON")")
         }
 
         // Setup hotkey from preferences
@@ -1305,7 +1298,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup focus change monitoring to auto-show toolbar
         setupFocusChangeMonitoring()
 
-        debugWindowController?.logEvent("  ✅ Temp off toolbar enabled")
+        debugWindowController?.logEvent("Temp off toolbar enabled")
         
         // Check if user is already focused on a text input and show toolbar immediately
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -1333,7 +1326,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Clear last focused element so re-enable will re-check
         lastFocusedElement = nil
 
-        debugWindowController?.logEvent("  ⏹️ Temp off toolbar disabled")
+        debugWindowController?.logEvent("Temp off toolbar disabled")
     }
 
     /// Setup monitoring for focus changes to auto-show toolbar when focusing text fields
@@ -1353,7 +1346,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // We'll use a timer to periodically check focus (more reliable)
         setupFocusCheckTimer()
 
-        debugWindowController?.logEvent("  ✅ Focus change monitoring enabled")
+        debugWindowController?.logEvent("Focus change monitoring enabled")
     }
 
     private var focusCheckTimer: Timer?
@@ -1467,7 +1460,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard hotkey.keyCode != 0 else {
             eventTapManager?.toolbarHotkey = nil
             eventTapManager?.onToolbarHotkey = nil
-            debugWindowController?.logEvent("  ⏹️ Temp off toolbar hotkey disabled (no key set)")
+            debugWindowController?.logEvent("  Temp off toolbar hotkey disabled (no key set)")
             return
         }
 
@@ -1476,10 +1469,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         eventTapManager?.toolbarHotkey = hotkey
         eventTapManager?.onToolbarHotkey = { [weak self] in
             TempOffToolbarController.shared.toggle()
-            self?.debugWindowController?.logEvent("🔧 Temp off toolbar toggled via hotkey (\(hotkey.displayString))")
+            self?.debugWindowController?.logEvent("Temp off toolbar toggled via hotkey (\(hotkey.displayString))")
         }
 
-        debugWindowController?.logEvent("  ✅ Temp off toolbar hotkey: \(hotkey.displayString) (via EventTap)")
+        debugWindowController?.logEvent("Temp off toolbar hotkey: \(hotkey.displayString) (via EventTap)")
     }
 
     /// Show temp off toolbar programmatically

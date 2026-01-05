@@ -32,6 +32,7 @@ extension VNEngine {
         var macroEnabled: Bool = false
         var macroInEnglishMode: Bool = false
         var autoCapsMacro: Bool = false
+        var addSpaceAfterMacro: Bool = false
         
         // Smart switch
         var smartSwitchEnabled: Bool = false
@@ -74,6 +75,7 @@ extension VNEngine {
         vUseMacro = settings.macroEnabled ? 1 : 0
         vUseMacroInEnglishMode = settings.macroInEnglishMode ? 1 : 0
         vAutoCapsMacro = settings.autoCapsMacro ? 1 : 0
+        vAddSpaceAfterMacro = settings.addSpaceAfterMacro ? 1 : 0
         
         // Smart switch
         vUseSmartSwitchKey = settings.smartSwitchEnabled ? 1 : 0
@@ -119,6 +121,7 @@ extension VNEngine {
         settings.macroEnabled = vUseMacro == 1
         settings.macroInEnglishMode = vUseMacroInEnglishMode == 1
         settings.autoCapsMacro = vAutoCapsMacro == 1
+        settings.addSpaceAfterMacro = vAddSpaceAfterMacro == 1
         
         // Smart switch
         settings.smartSwitchEnabled = vUseSmartSwitchKey == 1

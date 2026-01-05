@@ -593,9 +593,15 @@ class CharacterInjector {
             }
         }
 
-        // AX not supported - fallback to allow Forward Delete
-        // This handles Spotlight, Raycast, Alfred, etc. that don't support AX
-        debugCallback?("  [FwdDel] Allowed: AX not supported (fallback)")
+        // AX not supported - ALLOW Forward Delete
+        // This is safe because we already checked isTypingMidSentence above.
+        // If we reach here, it means:
+        // 1. User has NOT pressed Enter recently (Enter sets isTypingMidSentence = true)
+        // 2. User has NOT clicked into middle of text (mouse click sets isTypingMidSentence = true)
+        // 3. User has NOT used arrow keys to move cursor (also sets isTypingMidSentence = true)
+        // Therefore, there's no indication of text after cursor, so Forward Delete is safe.
+        // This allows Spotlight, Raycast, Alfred to work correctly.
+        debugCallback?("  [FwdDel] Allowed: AX not supported, but isTypingMidSentence=false")
         return true
     }
 
@@ -623,9 +629,10 @@ class CharacterInjector {
             }
         }
 
-        // AX not supported - fallback to allow Forward Delete
-        // Browsers usually support AX, but fallback to allow for edge cases
-        debugCallback?("  [FwdDel-AC] Allowed: AX not supported (fallback)")
+        // AX not supported - ALLOW Forward Delete
+        // Same reasoning as shouldSendForwardDelete(): isTypingMidSentence was already checked.
+        // If user hasn't pressed Enter, clicked, or moved cursor, Forward Delete is safe.
+        debugCallback?("  [FwdDel-AC] Allowed: AX not supported, but isTypingMidSentence=false")
         return true
     }
 

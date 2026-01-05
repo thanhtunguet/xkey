@@ -21,13 +21,16 @@ class DebugWindowController: NSWindowController, DebugWindowControllerProtocol {
         // Wrap in hosting controller
         let hostingController = NSHostingController(rootView: debugView)
         
-        // Create window
+        // Create window with modern styling
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "XKey Debug Window"
-        window.styleMask = [.titled, .closable, .resizable]
+        window.title = "XKey Debug Console"
+        window.styleMask = [.titled, .closable, .resizable, .miniaturizable]
         window.isReleasedWhenClosed = false
-        window.setContentSize(NSSize(width: 800, height: 600))
+        window.setContentSize(NSSize(width: 900, height: 700))
+        window.minSize = NSSize(width: 700, height: 500)
         window.level = .floating  // Always on top by default
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.center()
         
         super.init(window: window)

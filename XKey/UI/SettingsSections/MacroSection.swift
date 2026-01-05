@@ -29,6 +29,8 @@ struct MacroSection: View {
                                 .padding(.leading, 20)
                             Toggle("Tự động viết hoa macro", isOn: $prefsViewModel.preferences.autoCapsMacro)
                                 .padding(.leading, 20)
+                            Toggle("Thêm dấu cách sau macro", isOn: $prefsViewModel.preferences.addSpaceAfterMacro)
+                                .padding(.leading, 20)
                         }
                     }
                 }

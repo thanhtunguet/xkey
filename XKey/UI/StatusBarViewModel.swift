@@ -47,7 +47,7 @@ class StatusBarViewModel: ObservableObject {
     func toggleVietnamese() {
         isVietnameseEnabled.toggle()
         keyboardHandler?.setVietnamese(isVietnameseEnabled)
-        log("🔄 Vietnamese toggled: \(isVietnameseEnabled ? "ON" : "OFF")")
+        log("Vietnamese toggled: \(isVietnameseEnabled ? "ON" : "OFF")")
         
         // Play beep sound if enabled
         let prefs = SharedSettings.shared.loadPreferences()
@@ -70,9 +70,9 @@ class StatusBarViewModel: ObservableObject {
             // Check if an overlay app (Spotlight/Raycast/Alfred) is currently visible
             if OverlayAppDetector.shared.isOverlayAppVisible() {
                 if let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() {
-                    log("⚠️ Smart Switch: Skipping save (overlay app '\(overlayName)' is active)")
+                    log("Smart Switch: Skipping save (overlay app '\(overlayName)' is active)")
                 } else {
-                    log("⚠️ Smart Switch: Skipping save (overlay app detected)")
+                    log("Smart Switch: Skipping save (overlay app detected)")
                 }
                 // Don't save language preference when overlay is active
                 // This prevents overwriting the underlying app's language setting
@@ -96,9 +96,9 @@ class StatusBarViewModel: ObservableObject {
         
         if let handler = keyboardHandler {
             handler.inputMethod = method
-            log("✅ Set handler.inputMethod to \(method.displayName)")
+            log("Set handler.inputMethod to \(method.displayName)")
         } else {
-            log("⚠️ keyboardHandler is nil!")
+            log("keyboardHandler is nil!")
         }
         
         // Save to preferences
@@ -122,7 +122,7 @@ class StatusBarViewModel: ObservableObject {
         prefs.codeTable = table
         SharedSettings.shared.savePreferences(prefs)
         
-        log("✅ CodeTable set to \(table.displayName)")
+        log("CodeTable set to \(table.displayName)")
     }
     
     func openPreferences() {

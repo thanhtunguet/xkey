@@ -25,6 +25,10 @@ class DebugViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Pinned Configuration (not cleared)
+    @Published var pinnedConfigInfo: [String] = []
+    @Published var showPinnedConfig = true
+    
     // MARK: - File-Based Logging Properties
     
     /// Log file URL
@@ -50,6 +54,9 @@ class DebugViewModel: ObservableObject {
     
     /// Track if window is visible (skip reading when hidden)
     @Published var isWindowVisible = true
+    
+    /// Track if config was logged on first open
+    private var hasLoggedInitialConfig = false
     
     private var cancellables = Set<AnyCancellable>()
     
@@ -102,9 +109,6 @@ class DebugViewModel: ObservableObject {
 
         // Create/overwrite file with header
         try? header.write(to: logFileURL, atomically: true, encoding: .utf8)
-
-        writeToFileAsync("Debug window initialized")
-        writeToFileAsync("Using file-based logging for better performance")
     }
     
     private func loadExistingLogs() {
@@ -241,7 +245,104 @@ class DebugViewModel: ObservableObject {
         // Reinitialize log file
         initializeLogFile()
         
-        updateStatus("Logs cleared")
+        // Auto-log current configuration after clearing
+        logCurrentConfig()
+        
+        updateStatus("Logs cleared (config preserved)")
+    }
+    
+    // MARK: - Configuration Summary
+    
+    /// Generate current configuration summary lines
+    func generateConfigSummary() -> [String] {
+        let settings = SharedSettings.shared
+        var lines: [String] = []
+        
+        // Header
+        lines.append("=== CURRENT CONFIGURATION ===")
+        
+        // Input Method
+        let inputMethodName: String
+        switch settings.inputMethod {
+        case 0: inputMethodName = "Telex"
+        case 1: inputMethodName = "VNI"
+        case 2: inputMethodName = "Simple Telex"
+        default: inputMethodName = "Unknown (\(settings.inputMethod))"
+        }
+        lines.append("Input Method: \(inputMethodName)")
+        
+        // Code Table
+        let codeTableName: String
+        switch settings.codeTable {
+        case 0: codeTableName = "Unicode"
+        case 1: codeTableName = "VNI Windows"
+        case 2: codeTableName = "TCVN3"
+        default: codeTableName = "Unknown (\(settings.codeTable))"
+        }
+        lines.append("Code Table: \(codeTableName)")
+        lines.append("")
+        
+        // Key settings
+        lines.append("[Input Settings]")
+        lines.append("  Modern Style: \(settings.modernStyle ? "ON" : "OFF")")
+        lines.append("  Spell Check: \(settings.spellCheckEnabled ? "ON" : "OFF")")
+        lines.append("  Fix Autocomplete: \(settings.fixAutocomplete ? "ON" : "OFF")")
+        lines.append("  Free Mark: \(settings.freeMarkEnabled ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Quick Telex
+        lines.append("[Quick Telex]")
+        lines.append("  Quick Telex (cc->ch): \(settings.quickTelexEnabled ? "ON" : "OFF")")
+        lines.append("  Quick Start Consonant: \(settings.quickStartConsonantEnabled ? "ON" : "OFF")")
+        lines.append("  Quick End Consonant: \(settings.quickEndConsonantEnabled ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Spell check options
+        lines.append("[Spell Check Options]")
+        lines.append("  Restore if Wrong: \(settings.restoreIfWrongSpelling ? "ON" : "OFF")")
+        lines.append("  Instant Restore: \(settings.instantRestoreOnWrongSpelling ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Macro
+        lines.append("[Macro]")
+        lines.append("  Macro Enabled: \(settings.macroEnabled ? "ON" : "OFF")")
+        lines.append("  Macro in English: \(settings.macroInEnglishMode ? "ON" : "OFF")")
+        lines.append("  Auto Caps Macro: \(settings.autoCapsMacro ? "ON" : "OFF")")
+        lines.append("  Add Space After: \(settings.addSpaceAfterMacro ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Smart Switch
+        lines.append("[Smart Switch]")
+        lines.append("  Smart Switch: \(settings.smartSwitchEnabled ? "ON" : "OFF")")
+        lines.append("  Detect Overlay Apps: \(settings.detectOverlayApps ? "ON" : "OFF")")
+        lines.append("")
+        
+        // IMKit
+        lines.append("[IMKit]")
+        lines.append("  IMKit Enabled: \(settings.imkitEnabled ? "ON" : "OFF")")
+        lines.append("  Use Marked Text: \(settings.imkitUseMarkedText ? "ON" : "OFF")")
+        lines.append("")
+        
+        // Toolbar
+        lines.append("[Toolbar]")
+        lines.append("  Temp Off Toolbar: \(settings.tempOffToolbarEnabled ? "ON" : "OFF")")
+        
+        lines.append("=== END CONFIGURATION ===")
+        
+        return lines
+    }
+    
+    /// Refresh pinned configuration display
+    func refreshPinnedConfig() {
+        pinnedConfigInfo = generateConfigSummary()
+    }
+    
+    /// Log current configuration to debug log (file only, timer will read and display)
+    func logCurrentConfig() {
+        let configLines = generateConfigSummary()
+        for line in configLines {
+            writeToFileAsync(line)
+        }
     }
     
     func toggleLogging() {
@@ -270,6 +371,12 @@ class DebugViewModel: ObservableObject {
         isWindowVisible = true
         // Force read when window becomes visible
         readNewLogs()
+        
+        // Log configuration on first open (like Clear button does)
+        if !hasLoggedInitialConfig {
+            hasLoggedInitialConfig = true
+            logCurrentConfig()
+        }
     }
     
     func windowDidBecomeHidden() {
