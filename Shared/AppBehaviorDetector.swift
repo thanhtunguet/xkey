@@ -331,13 +331,12 @@ class AppBehaviorDetector {
     var overlayAppNameProvider: (() -> String?)?
     
     // MARK: - Cache
-    
+
     private var cachedBundleId: String?
     private var cachedWindowTitle: String?
     private var cachedMatchedRule: WindowTitleRule?
     private var cachedBehavior: AppBehavior?
     private var cachedIMKitBehavior: IMKitBehavior?
-    private var cachedInjectionMethod: InjectionMethodInfo?
     
     // MARK: - Window Title Rules
     
@@ -684,7 +683,6 @@ class AppBehaviorDetector {
         cachedMatchedRule = nil
         cachedBehavior = nil
         cachedIMKitBehavior = nil
-        cachedInjectionMethod = nil
     }
     
     // MARK: - Window Title Detection
@@ -1017,25 +1015,21 @@ class AppBehaviorDetector {
     }
     
     // MARK: - CGEvent Injection Method Detection
-    
+
     /// Detect injection method for CGEvent-based character injection (used by CharacterInjector)
     /// First checks Window Title Rules, then falls back to bundle ID based detection
+    ///
+    /// Note: No caching is used here because:
+    /// 1. We must always call AX APIs to get current role (focus can change via keyboard)
+    /// 2. The detection logic (string comparisons, Set lookups) is very fast
+    /// 3. Simpler code without cache = fewer bugs
     func detectInjectionMethod() -> InjectionMethodInfo {
         guard let bundleId = getCurrentBundleId() else {
             return .defaultFast
         }
-        
-        // Check cache (must also check window title for full cache validity)
-        let windowTitle = getCachedWindowTitle()
-        if bundleId == cachedBundleId,
-           windowTitle == cachedWindowTitle,
-           let method = cachedInjectionMethod {
-            return method
-        }
-        
-        cachedBundleId = bundleId
-        cachedWindowTitle = windowTitle
-        
+
+        let currentRole = getFocusedElementRole()
+
         // Priority 1: Check Window Title Rules for context-specific injection method
         if let rule = findMatchingRule(),
            let injectionMethod = rule.injectionMethod {
@@ -1051,28 +1045,23 @@ class AppBehaviorDetector {
                 case .autocomplete: delays = (1000, 3000, 1000)
                 }
             }
-            
+
             // Get text sending method from rule, default to chunked
             let textMethod = rule.textSendingMethod ?? .chunked
-            
-            let info = InjectionMethodInfo(
+
+            return InjectionMethodInfo(
                 method: injectionMethod,
                 delays: delays,
                 textSendingMethod: textMethod,
                 description: rule.name
             )
-            cachedInjectionMethod = info
-            return info
         }
-        
-        // Priority 2: Fall back to bundle ID based detection  
-        cachedInjectionMethod = getInjectionMethod(for: bundleId)
-        
-        return cachedInjectionMethod ?? .defaultFast
+
+        // Priority 2: Fall back to bundle ID based detection
+        return getInjectionMethod(for: bundleId, role: currentRole)
     }
-    
-    private func getInjectionMethod(for bundleId: String) -> InjectionMethodInfo {
-        let role = getFocusedElementRole()
+
+    private func getInjectionMethod(for bundleId: String, role: String?) -> InjectionMethodInfo {
         
         // Selection method for autocomplete UI elements (ComboBox, SearchField)
         if role == "AXComboBox" || role == "AXSearchField" {
