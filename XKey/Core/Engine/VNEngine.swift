@@ -594,6 +594,17 @@ class VNEngine {
         
         // Handle D key
         if isKeyD(keyCode: keyCode, inputType: vInputType) {
+            // FREE MARK CHECK: When vFreeMark is OFF, only allow đ if last char is 'd'
+            // Example: "d + d" → "đ" OK, "d + i + d" → NOT OK (must type "d + d + i")
+            if vFreeMark == 0 && index > 0 {
+                let lastChar = chr(Int(index) - 1)
+                if lastChar != VietnameseData.KEY_D {
+                    logCallback?("handleMainKey: Free Mark OFF - D key rejected, last char is not 'd'")
+                    insertKey(keyCode: keyCode, isCaps: isCaps)
+                    return
+                }
+            }
+            
             var isCorrect = false
             var isChanged = false
             var k = Int(index)
@@ -651,13 +662,29 @@ class VNEngine {
         var isCorrect = false
         var isChanged = false
         
-        logCallback?("handleMarkKey: keyCode=\(keyCode), index=\(index), buffer=\(getCurrentWord())")
+        logCallback?("handleMarkKey: keyCode=\(keyCode), index=\(index), buffer=\(getCurrentWord()), vFreeMark=\(vFreeMark)")
         
         // Ignore "qu" case - OpenKey: checkCorrectVowel
         if index >= 2 && chr(Int(index) - 1) == VietnameseData.KEY_U && chr(Int(index) - 2) == VietnameseData.KEY_Q {
             logCallback?("  → Skipping: qu case")
             insertKey(keyCode: keyCode, isCaps: isCaps)
             return
+        }
+        
+        // FREE MARK CHECK: When vFreeMark is OFF (0), only allow placing tone marks
+        // if the last character is a vowel (mark must be typed immediately after vowel)
+        // Example: "a + s" → OK, "a + n + h + s" → NOT OK (must type "a + s + n + h")
+        if vFreeMark == 0 && index > 0 {
+            let lastChar = chr(Int(index) - 1)
+            let isLastCharVowel = vietnameseData.isVowelKey(lastChar)
+            logCallback?("  → Free Mark OFF: lastChar=\(lastChar), isVowel=\(isLastCharVowel)")
+            
+            if !isLastCharVowel {
+                // Last character is not a vowel, cannot place mark here in non-free-mark mode
+                logCallback?("  → Rejected: Free Mark is OFF and last char is not a vowel")
+                insertKey(keyCode: keyCode, isCaps: isCaps)
+                return
+            }
         }
         
         for (vowelKey, charsets) in vietnameseData.vowelForMarkTable {
@@ -757,7 +784,8 @@ class VNEngine {
             logCallback?("  → No pattern matched, checking for VNI fallback...")
             
             // VNI fallback: For keys 1-5, if pattern didn't match but we have vowels,
-            // try to apply tone anyway (free-mark style like Telex)
+            // try to apply tone anyway. Note: This only runs when Free Mark is ON
+            // or when last char is a vowel (we return early above otherwise).
             if vInputType == 1 && (keyCode == VietnameseData.KEY_1 || keyCode == VietnameseData.KEY_2 ||
                                    keyCode == VietnameseData.KEY_3 || keyCode == VietnameseData.KEY_4 ||
                                    keyCode == VietnameseData.KEY_5) {
@@ -790,12 +818,85 @@ class VNEngine {
     }
     
     private func handleVowelKey(keyCode: UInt16, isCaps: Bool) {
-        logCallback?("handleVowelKey: keyCode=\(keyCode), index=\(index), tempDisableKey=\(tempDisableKey), buffer=\(getCurrentWord())")
+        logCallback?("handleVowelKey: keyCode=\(keyCode), index=\(index), tempDisableKey=\(tempDisableKey), buffer=\(getCurrentWord()), vFreeMark=\(vFreeMark)")
         
         // Ignore "qu" case - OpenKey: checkCorrectVowel
         if index >= 2 && chr(Int(index) - 1) == VietnameseData.KEY_U && chr(Int(index) - 2) == VietnameseData.KEY_Q {
             insertKey(keyCode: keyCode, isCaps: isCaps)
             return
+        }
+        
+        // FREE MARK CHECK: When vFreeMark is OFF, only allow vowel modifiers
+        // if the last character is the corresponding vowel
+        // Example for Telex: "a + a" → "â" OK, "a + n + a" → NOT OK (must type "a + a + n")
+        // Example for VNI: "a + 6" → "â" OK, "a + n + 6" → NOT OK
+        if vFreeMark == 0 && index > 0 {
+            let lastChar = chr(Int(index) - 1)
+            var expectedVowels: [UInt16] = []
+            var needsExtraVowelCheck = false  // For W key, need additional check
+            
+            if vInputType != 1 { // Telex
+                switch keyCode {
+                case VietnameseData.KEY_A:
+                    expectedVowels = [VietnameseData.KEY_A]  // aa → â
+                case VietnameseData.KEY_O:
+                    expectedVowels = [VietnameseData.KEY_O]  // oo → ô
+                case VietnameseData.KEY_E:
+                    expectedVowels = [VietnameseData.KEY_E]  // ee → ê
+                case VietnameseData.KEY_W:
+                    expectedVowels = [VietnameseData.KEY_U, VietnameseData.KEY_O, VietnameseData.KEY_A]  // w → ư, ơ, ă
+                    needsExtraVowelCheck = true
+                default:
+                    break
+                }
+            } else { // VNI
+                switch keyCode {
+                case VietnameseData.KEY_6:
+                    expectedVowels = [VietnameseData.KEY_A, VietnameseData.KEY_E, VietnameseData.KEY_O]  // 6 → ^
+                    needsExtraVowelCheck = true
+                case VietnameseData.KEY_7:
+                    expectedVowels = [VietnameseData.KEY_U, VietnameseData.KEY_O]  // 7 → móc (ư, ơ)
+                    needsExtraVowelCheck = true
+                case VietnameseData.KEY_8:
+                    expectedVowels = [VietnameseData.KEY_A]  // 8 → trăng (ă)
+                    needsExtraVowelCheck = true
+                default:
+                    break
+                }
+            }
+            
+            // If this key adds a vowel modifier, check if last char is expected
+            if !expectedVowels.isEmpty && !expectedVowels.contains(lastChar) {
+                logCallback?("  → Free Mark OFF: lastChar=\(lastChar), expectedVowels=\(expectedVowels) - REJECTED")
+                insertKey(keyCode: keyCode, isCaps: isCaps)
+                return
+            }
+            
+            // Additional check for W key (and VNI 6/7/8): reject if there are UNMODIFIED vowels before lastChar
+            // This prevents insertW() from going back and modifying an earlier vowel
+            // Example: "u + a + w" - lastChar is 'a', but insertW would modify 'u' → ư, which is "free mark" behavior
+            // Exception: if the earlier vowel is ALREADY modified (has TONEW_MASK or TONE_MASK), it's fine
+            // Example: "ư + o + w" - 'ư' is already modified, so 'w' will only modify 'o' → ơ
+            if needsExtraVowelCheck && expectedVowels.contains(lastChar) {
+                // Count UNMODIFIED vowels before the lastChar
+                var unmodifiedVowelCountBeforeLast = 0
+                for i in 0..<(Int(index) - 1) {
+                    if vietnameseData.isVowelKey(chr(i)) {
+                        // Check if this vowel is already modified
+                        let isAlreadyModified = (typingWord[i] & VNEngine.TONEW_MASK) != 0 || 
+                                                (typingWord[i] & VNEngine.TONE_MASK) != 0
+                        if !isAlreadyModified {
+                            unmodifiedVowelCountBeforeLast += 1
+                        }
+                    }
+                }
+                
+                if unmodifiedVowelCountBeforeLast > 0 {
+                    logCallback?("  → Free Mark OFF: W key with \(unmodifiedVowelCountBeforeLast) unmodified vowels before lastChar - REJECTED (would modify earlier vowel)")
+                    insertKey(keyCode: keyCode, isCaps: isCaps)
+                    return
+                }
+            }
         }
         
         // Check VNI special case - find the vowel to apply circumflex/horn
