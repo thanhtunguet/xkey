@@ -29,7 +29,6 @@ enum SharedSettingsKey: String {
     case codeTable = "XKey.codeTable"
     case modernStyle = "XKey.modernStyle"
     case spellCheckEnabled = "XKey.spellCheckEnabled"
-    case fixAutocomplete = "XKey.fixAutocomplete"
 
     // Advanced settings
     case quickTelexEnabled = "XKey.quickTelexEnabled"
@@ -112,8 +111,7 @@ class SharedSettings {
         SharedSettingsKey.quickTelexEnabled.rawValue: false,
         SharedSettingsKey.restoreIfWrongSpelling.rawValue: true,
         SharedSettingsKey.freeMarkEnabled.rawValue: false,
-        SharedSettingsKey.imkitUseMarkedText.rawValue: true,
-        SharedSettingsKey.fixAutocomplete.rawValue: true
+        SharedSettingsKey.imkitUseMarkedText.rawValue: true
     ]
     
     /// Cache of plist URL (computed once)
@@ -301,11 +299,6 @@ class SharedSettings {
             writeBool(newValue, forKey: SharedSettingsKey.spellCheckEnabled.rawValue)
             notifySettingsChanged()
         }
-    }
-
-    var fixAutocomplete: Bool {
-        get { readBool(forKey: SharedSettingsKey.fixAutocomplete.rawValue) }
-        set { writeBool(newValue, forKey: SharedSettingsKey.fixAutocomplete.rawValue) }
     }
 
     // MARK: - Advanced Settings
@@ -779,7 +772,6 @@ class SharedSettings {
         }
         prefs.modernStyle = modernStyle
         prefs.spellCheckEnabled = spellCheckEnabled
-        prefs.fixAutocomplete = fixAutocomplete
 
         // Advanced settings
         prefs.quickTelexEnabled = quickTelexEnabled
@@ -890,7 +882,6 @@ class SharedSettings {
         codeTable = prefs.codeTable.rawValue
         modernStyle = prefs.modernStyle
         spellCheckEnabled = prefs.spellCheckEnabled
-        fixAutocomplete = prefs.fixAutocomplete
 
         // Advanced settings
         quickTelexEnabled = prefs.quickTelexEnabled

@@ -40,9 +40,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         didSet { updateEngineSettings() }
     }
     
-    @Published var fixAutocomplete: Bool = true {
-        didSet { updateEngineSettings() }
-    }
+
     
     // Advanced features
     @Published var quickTelexEnabled: Bool = true {
@@ -476,8 +474,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                         injector.sendBackspaces(
                             count: result.backspaceCount,
                             codeTable: codeTable,
-                            proxy: proxy,
-                            fixAutocomplete: engine.settings.fixAutocomplete
+                            proxy: proxy
                         )
                     }
                     
@@ -538,8 +535,7 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
                 backspaceCount: result.backspaceCount,
                 characters: result.newCharacters,
                 codeTable: codeTable,
-                proxy: proxy,
-                fixAutocomplete: engine.settings.fixAutocomplete
+                proxy: proxy
             )
 
             // Consume original event
@@ -618,7 +614,6 @@ class KeyboardEventHandler: EventTapManager.EventTapDelegate {
         settings.codeTable = codeTable
         settings.modernStyle = modernStyle
         settings.spellCheckEnabled = spellCheckEnabled
-        settings.fixAutocomplete = fixAutocomplete
         
         // Advanced features
         settings.quickTelexEnabled = quickTelexEnabled

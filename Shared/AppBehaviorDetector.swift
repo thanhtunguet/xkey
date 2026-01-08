@@ -364,13 +364,12 @@ class AppBehaviorDetector {
     /// Force override delays (set by Injection Test)
     var forceDelays: InjectionDelays? = nil
     
-    // MARK: - Cache
+    // MARK: - Cache (only for detect() which is used for UI display)
+    // Note: detectInjectionMethod(), findMatchingRule(), and detectIMKitBehavior() 
+    // don't use cache to ensure fresh detection on every keystroke
 
     private var cachedBundleId: String?
-    private var cachedWindowTitle: String?
-    private var cachedMatchedRule: WindowTitleRule?
     private var cachedBehavior: AppBehavior?
-    private var cachedIMKitBehavior: IMKitBehavior?
     
     // MARK: - Window Title Rules
     
@@ -666,40 +665,30 @@ class AppBehaviorDetector {
     
     /// Detect IMKit-specific behavior
     /// First checks Window Title Rules, then falls back to bundle ID based detection
+    ///
+    /// Note: No caching is used here because:
+    /// 1. Focus can change within same window (e.g., Google Docs content → address bar)
+    /// 2. Window title might change (e.g., switching tabs)
+    /// 3. The detection logic is very fast
+    /// 4. Simpler code without cache = fewer bugs
     func detectIMKitBehavior() -> IMKitBehavior {
         guard let bundleId = getCurrentBundleId() else {
             return .standard
         }
         
-        // Check cache (must also check window title for full cache validity)
-        let windowTitle = getCachedWindowTitle()
-        if bundleId == cachedBundleId, 
-           windowTitle == cachedWindowTitle,
-           let behavior = cachedIMKitBehavior {
-            return behavior
-        }
-        
-        cachedBundleId = bundleId
-        cachedWindowTitle = windowTitle
-        
         // Priority 1: Check Window Title Rules for context-specific behavior
         if let rule = findMatchingRule() {
-            let behavior = IMKitBehavior(
+            return IMKitBehavior(
                 useMarkedText: rule.useMarkedText ?? true,
                 hasMarkedTextIssues: rule.hasMarkedTextIssues ?? false,
                 commitDelay: rule.commitDelay ?? 0,
                 description: rule.name
             )
-            cachedIMKitBehavior = behavior
-            return behavior
         }
         
         // Priority 2: Fall back to bundle ID based detection
         let appBehavior = detectBehavior(for: bundleId)
-        cachedBehavior = appBehavior
-        cachedIMKitBehavior = getIMKitBehavior(for: bundleId, appBehavior: appBehavior)
-        
-        return cachedIMKitBehavior ?? .standard
+        return getIMKitBehavior(for: bundleId, appBehavior: appBehavior)
     }
     
     /// Get current frontmost app's bundle identifier
@@ -852,10 +841,7 @@ class AppBehaviorDetector {
     /// Clear cache (call when app changes)
     func clearCache() {
         cachedBundleId = nil
-        cachedWindowTitle = nil
-        cachedMatchedRule = nil
         cachedBehavior = nil
-        cachedIMKitBehavior = nil
     }
     
     // MARK: - Window Title Detection
@@ -908,24 +894,19 @@ class AppBehaviorDetector {
     
     /// Find matching Window Title Rule for current context
     /// Returns the first matching rule (custom rules have priority over built-in rules)
+    ///
+    /// Note: No caching is used here because:
+    /// 1. Focus can change within same window (e.g., Google Docs content → address bar)
+    /// 2. Window title might change (e.g., switching tabs)
+    /// 3. The detection logic (string comparisons) is very fast
+    /// 4. Simpler code without cache = fewer bugs
     func findMatchingRule() -> WindowTitleRule? {
         guard let bundleId = getCurrentBundleId() else {
             return nil
         }
         
-        // Get window title (with caching)
-        let windowTitle: String
-        if let cached = cachedWindowTitle, bundleId == cachedBundleId {
-            windowTitle = cached
-        } else {
-            windowTitle = getCurrentWindowTitle() ?? ""
-            cachedWindowTitle = windowTitle
-        }
-        
-        // Check cached result
-        if bundleId == cachedBundleId, let rule = cachedMatchedRule {
-            return rule
-        }
+        // Always get fresh window title (no caching)
+        let windowTitle = getCurrentWindowTitle() ?? ""
         
         // Note: Empty window title is OK - rules with empty titlePattern will still match
         // This allows rules that apply to all windows of an app (e.g., Firefox rule)
@@ -933,7 +914,6 @@ class AppBehaviorDetector {
         // Search in custom rules first (higher priority)
         for rule in customRules where rule.isEnabled {
             if rule.matches(bundleId: bundleId, windowTitle: windowTitle) {
-                cachedMatchedRule = rule
                 return rule
             }
         }
@@ -946,12 +926,10 @@ class AppBehaviorDetector {
                 continue
             }
             if rule.matches(bundleId: bundleId, windowTitle: windowTitle) {
-                cachedMatchedRule = rule
                 return rule
             }
         }
         
-        cachedMatchedRule = nil
         return nil
     }
     
@@ -960,15 +938,10 @@ class AppBehaviorDetector {
         return findMatchingRule() != nil
     }
     
-    /// Get current window title (cached)
+    /// Get current window title
+    /// Note: Name kept for backward compatibility, but no longer uses cache
     func getCachedWindowTitle() -> String {
-        if let cached = cachedWindowTitle, cachedBundleId == getCurrentBundleId() {
-            return cached
-        }
-        let title = getCurrentWindowTitle() ?? ""
-        cachedWindowTitle = title
-        cachedBundleId = getCurrentBundleId()
-        return title
+        return getCurrentWindowTitle() ?? ""
     }
     
     // MARK: - Custom Rules Management
@@ -1240,6 +1213,74 @@ class AppBehaviorDetector {
 
         let currentRole = getFocusedElementRole()
 
+        // Priority 0.3: Overlay launchers (Spotlight/Raycast/Alfred)
+        // MUST check this BEFORE browser address bar and Window Title Rules because:
+        // - Spotlight opens as overlay while Chrome may still be "frontmost app"
+        // - Window Title Rules (like Google Docs) would match first without this check
+        // - Spotlight/Raycast/Alfred need .autocomplete method
+        if let overlayName = overlayAppNameProvider?() {
+            if overlayName == "Terminal" {
+                // Terminal panel in VSCode/Cursor/etc - use slow method like other terminals
+                return InjectionMethodInfo(
+                    method: .slow,
+                    delays: (3000, 6000, 3000),
+                    textSendingMethod: .chunked,
+                    description: "Terminal (VSCode/Cursor)"
+                )
+            }
+            return InjectionMethodInfo(
+                method: .autocomplete,
+                delays: (1000, 3000, 1000),
+                textSendingMethod: .chunked,
+                description: "\(overlayName) (Overlay Launcher)"
+            )
+        }
+
+        // Priority 0.5: Check if focused element is browser address bar
+        // This takes precedence over Window Title Rules because:
+        // - User might be in Google Docs tab (Window Title = "Google Docs")
+        // - But clicked on address bar (focused element = Omnibox/AXTextField)
+        // - Address bar needs different injection method than Google Docs content
+        let isBrowserApp = Self.browserApps.contains(bundleId)
+            || Self.firefoxBasedBrowsers.contains(bundleId)
+            || Self.axAttributeDetectForBrowsers.contains(bundleId)
+        
+        if isBrowserApp {
+            // Safari address bar
+            if (bundleId == "com.apple.Safari" || bundleId == "com.apple.SafariTechnologyPreview")
+                && isSafariAddressBar() {
+                return InjectionMethodInfo(
+                    method: .selection,
+                    delays: (1000, 3000, 2000),
+                    textSendingMethod: .chunked,
+                    description: "Safari Address Bar"
+                )
+            }
+            
+            // Chromium address bar (Chrome, Edge, Brave, etc.)
+            if isChromiumAddressBar() {
+                return InjectionMethodInfo(
+                    method: .selection,
+                    delays: (1000, 3000, 2000),
+                    textSendingMethod: .chunked,
+                    description: "Chromium Address Bar"
+                )
+            }
+            
+            // Firefox-style address bar
+            if Self.firefoxBasedBrowsers.contains(bundleId) || Self.axAttributeDetectForBrowsers.contains(bundleId) {
+                if isFirefoxStyleAddressBar() {
+                    let method: InjectionMethod = Self.axAttributeDetectForBrowsers.contains(bundleId) ? .axDirect : .selection
+                    return InjectionMethodInfo(
+                        method: method,
+                        delays: (1000, 3000, 2000),
+                        textSendingMethod: .chunked,
+                        description: "Firefox-style Address Bar"
+                    )
+                }
+            }
+        }
+
         // Priority 1: Check Window Title Rules for context-specific injection method
         if let rule = findMatchingRule(),
            let injectionMethod = rule.injectionMethod {
@@ -1285,17 +1326,8 @@ class AppBehaviorDetector {
 
     private func getInjectionMethod(for bundleId: String, role: String?) -> InjectionMethodInfo {
         
-        // Selection method for autocomplete UI elements (ComboBox, SearchField)
-        if role == "AXComboBox" || role == "AXSearchField" {
-            return InjectionMethodInfo(
-                method: .selection,
-                delays: (1000, 3000, 2000),
-                textSendingMethod: .chunked,
-                description: "Selection (ComboBox/SearchField)"
-            )
-        }
-        
-        // Overlay launchers (Spotlight/Raycast/Alfred) - use autocomplete method
+        // Priority 1: Overlay launchers (Spotlight/Raycast/Alfred) - use autocomplete method
+        // MUST check this BEFORE AXComboBox/AXSearchField because Spotlight uses AXSearchField role
         // Terminal panels in VSCode/Cursor - use slow method
         // Priority: Check via injected overlay provider (from OverlayAppDetector in XKey)
         if let overlayName = overlayAppNameProvider?() {
@@ -1316,7 +1348,8 @@ class AppBehaviorDetector {
             )
         }
         
-        // Fallback: Bundle ID check for Spotlight
+        // Priority 2: Fallback bundle ID check for Spotlight/Raycast/Alfred
+        // (in case overlay provider is not available)
         if bundleId == "com.apple.Spotlight" {
             return InjectionMethodInfo(
                 method: .autocomplete,
@@ -1326,7 +1359,6 @@ class AppBehaviorDetector {
             )
         }
         
-        // Raycast
         if bundleId == "com.raycast.macos" {
             return InjectionMethodInfo(
                 method: .autocomplete,
@@ -1336,13 +1368,23 @@ class AppBehaviorDetector {
             )
         }
         
-        // Alfred
         if bundleId.contains("com.runningwithcrayons.Alfred") {
             return InjectionMethodInfo(
                 method: .autocomplete,
                 delays: (1000, 3000, 1000),
                 textSendingMethod: .chunked,
                 description: "Alfred"
+            )
+        }
+        
+        // Priority 3: Selection method for autocomplete UI elements (ComboBox, SearchField)
+        // Note: This comes AFTER Spotlight/Raycast/Alfred check to avoid conflict
+        if role == "AXComboBox" || role == "AXSearchField" {
+            return InjectionMethodInfo(
+                method: .selection,
+                delays: (1000, 3000, 2000),
+                textSendingMethod: .chunked,
+                description: "Selection (ComboBox/SearchField)"
             )
         }
 

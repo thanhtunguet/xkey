@@ -34,7 +34,6 @@ struct Preferences: Codable {
     var codeTable: CodeTable = .unicode
     var modernStyle: Bool = false
     var spellCheckEnabled: Bool = false
-    var fixAutocomplete: Bool = true
     
     // Advanced features
     var quickTelexEnabled: Bool = true           // cc→ch, gg→gi, etc.

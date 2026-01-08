@@ -16,7 +16,6 @@ extension VNEngine {
         var codeTable: CodeTable = .unicode
         var modernStyle: Bool = true
         var spellCheckEnabled: Bool = true
-        var fixAutocomplete: Bool = true
         var freeMarking: Bool = false
         
         // Advanced features
@@ -59,7 +58,6 @@ extension VNEngine {
         vUseModernOrthography = settings.modernStyle ? 1 : 0
         vCheckSpelling = settings.spellCheckEnabled ? 1 : 0
         useSpellCheckingBefore = settings.spellCheckEnabled  // Sync internal state to prevent restoration to old value
-        vFixRecommendBrowser = settings.fixAutocomplete ? 1 : 0
         
         // Advanced features
         vQuickTelex = settings.quickTelexEnabled ? 1 : 0
@@ -105,7 +103,6 @@ extension VNEngine {
         // Basic settings
         settings.modernStyle = vUseModernOrthography == 1
         settings.spellCheckEnabled = vCheckSpelling == 1
-        settings.fixAutocomplete = vFixRecommendBrowser == 1
         
         // Advanced features
         settings.quickTelexEnabled = vQuickTelex == 1

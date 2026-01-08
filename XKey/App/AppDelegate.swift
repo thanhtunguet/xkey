@@ -449,7 +449,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardHandler?.codeTable = preferences.codeTable
         keyboardHandler?.modernStyle = preferences.modernStyle
         keyboardHandler?.spellCheckEnabled = preferences.spellCheckEnabled
-        keyboardHandler?.fixAutocomplete = preferences.fixAutocomplete
         
         // Apply advanced features
         keyboardHandler?.quickTelexEnabled = preferences.quickTelexEnabled
@@ -508,8 +507,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugWindowController?.logEvent("Undo typing disabled")
         }
 
-        // Log fix autocomplete setting
-        debugWindowController?.logEvent(preferences.fixAutocomplete ? "Fix autocomplete enabled (Forward Delete)" : "Fix autocomplete disabled")
 
         debugWindowController?.logEvent("Preferences applied (including advanced features)")
     }

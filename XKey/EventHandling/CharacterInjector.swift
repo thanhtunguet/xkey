@@ -86,7 +86,7 @@ class CharacterInjector {
     
     /// Inject text replacement synchronously - backspaces + new text in one atomic operation
     /// This prevents race conditions where next keystroke arrives between backspace and text injection
-    func injectSync(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy, fixAutocomplete: Bool = false) {
+    func injectSync(backspaceCount: Int, characters: [VNCharacter], codeTable: CodeTable, proxy: CGEventTapProxy) {
         // Acquire semaphore for entire injection operation
         injectionSemaphore.wait()
         defer { injectionSemaphore.signal() }
@@ -142,11 +142,8 @@ class CharacterInjector {
 
             case .slow, .fast:
                 debugCallback?("    → Backspace method: delays=\(delays), directPost=\(useDirectPost)")
-                // Use smart Forward Delete detection: checks AX API for text after cursor
-                if shouldSendForwardDelete(fixAutocomplete: fixAutocomplete) {
-                    sendForwardDelete(proxy: proxy)
-                    usleep(3000)
-                }
+                // Forward Delete is only used for .autocomplete method
+                // For slow/fast methods, just send backspaces
 
                 // Send backspaces immediately, then waits AFTER all backspaces are sent
                 for i in 0..<backspaceCount {
@@ -317,10 +314,11 @@ class CharacterInjector {
     
     // MARK: - Public Methods
 
-    /// Send backspace key presses with optional autocomplete fix
+    /// Send backspace key presses
     /// Uses adaptive delays based on detected app type (Terminal/JetBrains/etc.)
     /// Synchronized with semaphore to prevent race conditions
-    func sendBackspaces(count: Int, codeTable: CodeTable, proxy: CGEventTapProxy, fixAutocomplete: Bool = false) {
+    /// Note: Forward Delete is only used for .autocomplete method (Firefox, Spotlight, Raycast, Alfred)
+    func sendBackspaces(count: Int, codeTable: CodeTable, proxy: CGEventTapProxy) {
         guard count > 0 else { return }
 
         // Begin synchronized injection
@@ -332,10 +330,7 @@ class CharacterInjector {
         let method = methodInfo.method
         let delays = methodInfo.delays
 
-        debugCallback?("sendBackspaces: count=\(count), method=\(method), fixAutocomplete=\(fixAutocomplete), isTypingMidSentence=\(isTypingMidSentence)")
-
-        // Use smart Forward Delete detection
-        let shouldDoForwardDelete = shouldSendForwardDelete(fixAutocomplete: fixAutocomplete)
+        debugCallback?("sendBackspaces: count=\(count), method=\(method), isTypingMidSentence=\(isTypingMidSentence)")
 
         switch method {
         case .selection:
@@ -345,6 +340,7 @@ class CharacterInjector {
 
         case .autocomplete:
             // Autocomplete method: Forward Delete to clear suggestion, then backspaces
+            // This is the ONLY case where Forward Delete is used
             debugCallback?("    → Autocomplete method: Forward Delete + backspaces")
             injectViaAutocomplete(count: count, delays: delays, proxy: proxy)
 
@@ -356,32 +352,21 @@ class CharacterInjector {
 
         case .slow:
             // Slow method for Terminal/JetBrains: higher delays between keystrokes
+            // No Forward Delete - it's not needed for terminals
             debugCallback?("    → Slow method (Terminal/IDE): delays=\(delays)")
-            injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy, fixAutocomplete: shouldDoForwardDelete)
+            injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy)
 
         case .fast:
-            // Fast method: minimal delays
-            if shouldDoForwardDelete {
-                debugCallback?("    → Fast method with autocomplete fix")
-                sendForwardDelete(proxy: proxy)
-                usleep(3000)
-                injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy, fixAutocomplete: false)
-            } else {
-                debugCallback?("    → Fast method (normal)")
-                injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy, fixAutocomplete: false)
-            }
+            // Fast method: minimal delays, no Forward Delete
+            debugCallback?("    → Fast method (normal)")
+            injectViaBackspace(count: count, codeTable: codeTable, delays: delays, proxy: proxy)
         }
     }
     
     // MARK: - Injection Methods (Terminal/JetBrains compatible)
     
     /// Standard backspace injection with configurable delays
-    private func injectViaBackspace(count: Int, codeTable: CodeTable, delays: InjectionDelays, proxy: CGEventTapProxy, fixAutocomplete: Bool) {
-        if fixAutocomplete {
-            sendForwardDelete(proxy: proxy)
-            usleep(3000)
-        }
-        
+    private func injectViaBackspace(count: Int, codeTable: CodeTable, delays: InjectionDelays, proxy: CGEventTapProxy) {
         for i in 0..<count {
             sendBackspace(codeTable: codeTable, proxy: proxy)
             usleep(delays.backspace)
@@ -587,45 +572,7 @@ class CharacterInjector {
         return hasTextAfter
     }
 
-    /// Determine if Forward Delete should be sent for autocomplete fix
-    /// Only sends Forward Delete if:
-    /// 1. fixAutocomplete setting is enabled
-    /// 2. Not typing mid-sentence (based on cursor movement tracking)
-    /// 3. AX API confirms no text after cursor, OR AX not supported (fallback to allow)
-    private func shouldSendForwardDelete(fixAutocomplete: Bool) -> Bool {
-        // Must have fixAutocomplete enabled
-        guard fixAutocomplete else {
-            return false
-        }
 
-        // Don't send if we know cursor was moved (typing mid-sentence)
-        if isTypingMidSentence {
-            debugCallback?("  [FwdDel] Skipped: isTypingMidSentence=true")
-            return false
-        }
-
-        // Check via Accessibility API if there's text after cursor
-        if let hasTextAfter = hasTextAfterCursor() {
-            if hasTextAfter {
-                debugCallback?("  [FwdDel] Skipped: AX detected text after cursor")
-                return false
-            } else {
-                debugCallback?("  [FwdDel] Allowed: AX confirmed no text after cursor")
-                return true
-            }
-        }
-
-        // AX not supported - ALLOW Forward Delete
-        // This is safe because we already checked isTypingMidSentence above.
-        // If we reach here, it means:
-        // 1. User has NOT pressed Enter recently (Enter sets isTypingMidSentence = true)
-        // 2. User has NOT clicked into middle of text (mouse click sets isTypingMidSentence = true)
-        // 3. User has NOT used arrow keys to move cursor (also sets isTypingMidSentence = true)
-        // Therefore, there's no indication of text after cursor, so Forward Delete is safe.
-        // This allows Spotlight, Raycast, Alfred to work correctly.
-        debugCallback?("  [FwdDel] Allowed: AX not supported, but isTypingMidSentence=false")
-        return true
-    }
 
     /// Determine if Forward Delete should be sent for autocomplete method (Firefox/Safari address bar)
     /// Unlike shouldSendForwardDelete(), this doesn't check fixAutocomplete setting

@@ -82,7 +82,7 @@ class DebugViewModel: ObservableObject {
     private let readInterval: TimeInterval = 0.5
     
     /// Maximum lines to keep in memory
-    private let maxDisplayLines = 1000
+    private let maxDisplayLines = 5000
     
     /// Lock for file write operations
     private let writeLock = NSLock()
@@ -321,7 +321,6 @@ class DebugViewModel: ObservableObject {
         lines.append("[Input Settings]")
         lines.append("  Modern Style: \(settings.modernStyle ? "ON" : "OFF")")
         lines.append("  Spell Check: \(settings.spellCheckEnabled ? "ON" : "OFF")")
-        lines.append("  Fix Autocomplete: \(settings.fixAutocomplete ? "ON" : "OFF")")
         lines.append("  Free Mark: \(settings.freeMarkEnabled ? "ON" : "OFF")")
         lines.append("")
         

@@ -133,7 +133,6 @@ struct GeneralSection: View {
                 SettingsGroup(title: "Tùy chọn") {
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle("Kiểu gõ hiện đại (oà/uý)", isOn: $viewModel.preferences.modernStyle)
-                        Toggle("Sửa lỗi tự động hoàn thành (áp dụng cho Chrome, Terminal...)", isOn: $viewModel.preferences.fixAutocomplete)
                     }
                 }                
             }
