@@ -980,17 +980,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if isVisible {
                 // When overlay opens (hidden → visible):
                 // 1. Detect and set injection method for overlay (Spotlight/Raycast/Alfred)
-                // 2. Enable Vietnamese for overlay unless overlay has its own disable rule                
+                // 2. Enable Vietnamese for overlay unless overlay has its own disable rule
+                // 3. Reset mid-sentence flag (overlay apps start with empty/fresh input)
                 self.debugWindowController?.logEvent("Overlay opened - checking overlay rules")
                 self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
                 self.enableVietnameseForOverlay()
+                
+                // CRITICAL FIX: When overlay opens (e.g., CMD+Space for Spotlight),
+                // reset mid-sentence flag. The resetForAppSwitch() called earlier sets isTypingMidSentence=true
+                // to protect text in normal apps, but overlay apps always start fresh.
+                // If user clicks into existing text, mouse click handler will set mid-sentence appropriately.
+                self.keyboardHandler?.resetMidSentenceFlag()
+                let overlayName = OverlayAppDetector.shared.getVisibleOverlayAppName() ?? "Overlay"
+                self.debugWindowController?.logEvent("'\(overlayName)' opened → reset mid-sentence flag")
             } else {
                 // When overlay closes (visible → hidden):
                 // 1. Detect and set injection method for the underlying app
-                // 2. Restore language for current app                
+                // 2. Restore language for current app
+                // 3. Set mid-sentence flag (protect text in underlying app)
                 self.debugWindowController?.logEvent("Overlay closed - restoring language for current app")
                 self.debugWindowController?.logEvent("   Injection: \(injectionInfo.method) (\(injectionInfo.description)) ✓ confirmed")
                 self.restoreLanguageForCurrentApp()
+                
+                // When overlay closes, user returns to previous app where cursor position is unknown.
+                // Set mid-sentence flag to protect text on the right of cursor.
+                // Note: Overlay close doesn't trigger didActivateApplicationNotification since
+                // frontmost app is still the original app (Spotlight runs as overlay, not frontmost).
+                self.keyboardHandler?.resetWithCursorMoved()
+                self.debugWindowController?.logEvent("Overlay closed → set mid-sentence flag (protect underlying app)")
             }
         }
     }
